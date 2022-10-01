@@ -23,7 +23,7 @@ func ExecuteContract(ctx *gin.Context, privateKey string) {
 }
 
 func GetContractValue(ctx *gin.Context, privateKey string) {
-	val, err := contract.GetValue(ctx.Query("address"), privateKey)
+	val, err := contract.GetValue(ctx.Query("address"))
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err,

@@ -50,9 +50,8 @@ func InstallContract(privKeyHex string) (string, error) {
 	return address.String(), nil
 }
 
-
 func SetValue(newValue *big.Int, addressHex string, privKeyHex string) error {
-	
+
 	// client, err := ethclient.Dial("http://172.13.3.1:8545")
 	// if err != nil {
 	// 	return errors.New(fmt.Sprintf("Error dialing the node: %v", err))
@@ -74,25 +73,16 @@ func SetValue(newValue *big.Int, addressHex string, privKeyHex string) error {
 	return err
 }
 
-
-func GetValue(addressHex string, privKeyHex string) (*big.Int, error) {
+func GetValue(addressHex string) (*big.Int, error) {
 	storage, err := getContract(addressHex)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Error fetching contract with address [%v]", addressHex))
 	}
-	// transactOpts, err := buildTransactor(privKeyHex)
-	// if err != nil {
-	// 	return -1, err
-	// }
 
-	var callOpts bind.CallOpts
-	callOpts.Pending = false
-	callOpts.From = common.HexToAddress(addressHex)
-	val, err := storage.StorageCaller.Get(&callOpts)
+	val, err := storage.StorageCaller.Get(nil)
 
 	return val, nil
 }
-
 
 func getContract(addressHex string) (*Storage, error) {
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
