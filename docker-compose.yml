@@ -1,0 +1,14 @@
+version: '2'
+services:
+  mariadb:
+    container_name: mariadb
+    image: mariadb:10.7.6
+    ports:
+      - 3306:3306
+    volumes:
+      - ~/apps/mariadb:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_PASSWORD=mysqlPassword
+      - MYSQL_USER=db_user
+      - MYSQL_DATABASE=blockchain_db
