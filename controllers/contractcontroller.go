@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"math/big"
+
 	"github.com/bdunton9323/blockchain-playground/contract"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -13,5 +15,22 @@ func DeployContract(ctx *gin.Context, privateKey string) {
 	} else {
 		log.Infof("Contract address: %v", contractAddress)
 		ctx.String(200, contractAddress)
+	}
+}
+
+func ExecuteContract(ctx *gin.Context, privateKey string) {
+	contract.SetValue(big.NewInt(87), ctx.Query("address"), privateKey)
+}
+
+func GetContractValue(ctx *gin.Context, privateKey string) {
+	val, err := contract.GetValue(ctx.Query("address"), privateKey)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": err,
+		})
+	} else {
+		ctx.JSON(200, gin.H{
+			"value": &val,
+		})
 	}
 }

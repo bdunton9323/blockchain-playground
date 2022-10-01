@@ -18,6 +18,14 @@ func main() {
 		controllers.DeployContract(ctx, *privateKey)
 	})
 
+	router.POST("/contract/execute", func(ctx *gin.Context) {
+		controllers.ExecuteContract(ctx, *privateKey)
+	})
+
+	router.GET("/contract/value", func(ctx *gin.Context) {
+		controllers.GetContractValue(ctx, *privateKey)
+	})
+
 	// some examples for my own reference
 
 	// router.GET("/hello", func(ctx *gin.Context) {
