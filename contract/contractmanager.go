@@ -1,30 +1,48 @@
 package contract
 
 import (
-	"log"
-	"math/big"
-	"strings"
+	"encoding/hex"
+	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	log "github.com/sirupsen/logrus"
 )
 
+
 // returns the contract ID
-func InstallContract() string {
+func InstallContract(keyHexValue string) (string, error) {
 
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
-		log.Fatalf("Error dialing the node: %v", err)
+		return "", errors.New(fmt.Sprintf("Error dialing the node: %v", err))
 	}
 
-	// TODO: load in the key at startup time
-	//       This is a throwaway key for local dev so I don't care that it's in git
-	auth, err := bind.NewTransactorWithChainID(strings.NewReader("/home/bdunton/.ssh/ethereum_testing"), "superSecurePassword", big.NewInt(15))
+	key, err := hex.DecodeString(keyHexValue)
+	if err != nil {
+		log.Errorf("Could not decode hex: %v", err)
+	}
+
+	privateKey, err := crypto.ToECDSA(key)
+	if err != nil {
+		log.Errorf("Could not create private key: %v", err)
+	}
+
+	// TODO: this is deprecated. It wants NewKeyedTransactorWithChainID, but I don't know what to use for chainId
+	transactOps := bind.NewKeyedTransactor(privateKey)
 
 	if err != nil {
-		log.Fatalf("Could not connect to Ethereum: %v", err)
+		log.Errorf("Could not connect to Ethereum: %v", err)
 	}
 
-	DeployStorage(auth, client)
-	return "Installing the contract"
+	address, _, _, err := DeployStorage(transactOps, client)
+	if err != nil {
+		log.Errorf("Error deploying contract: %v", err)
+	} else {
+		log.Errorf("Deployed contract with address [%v]", address.String())
+	}
+
+	return address.String(), nil
 }
