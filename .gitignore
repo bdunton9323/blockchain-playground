@@ -17,3 +17,7 @@ blockchain-playground
 # vscode stuff
 .vscode
 __debug_bin
+node_modules
+
+# build output of smart contracts
+contract/build

@@ -3,11 +3,22 @@ Example application for me to experiment with blockchain
 
 ## Running it
 ### Compile the contract and generate bindings
+Install dependencies. From the root of the project:
 ```
-cd contract
-solc --abi simplestorage.sol -o build
-solc --bin simplestorage.sol -o build
-abigen --abi build/SimpleStorage.abi --pkg contract --type Storage --out simplestorage.go --bin build/SimpleStorage.bin
+npm install @openzeppelin/contracts@3.4.2
+```
+
+```
+# compile the contracts
+solc --allow-paths "$PWD/node_modules/@openzeppelin/" --abi contract/nft.sol -o contract/build
+solc --allow-paths "$PWD/node_modules/@openzeppelin/" --bin contract/nft.sol -o contract/build
+
+# build the Go bindings
+abigen --abi contract/build/MyToken.abi \
+    --pkg contract \
+    --type MyToken \
+    --out contract/mytoken.go \
+    --bin contract/build/MyToken.bin
 ```
 
 ### Run directly
