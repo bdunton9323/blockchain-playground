@@ -38,16 +38,9 @@ func MintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, 
 	if err != nil {
 		return nil, nil, err
 	}
-	// gasPrice, err := client.SuggestGasPrice(context.Background())
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
 
 	txOpts := bind.NewKeyedTransactor(privKey)
 	txOpts.Nonce = big.NewInt(int64(nonce))
-	// txOpts.Value = big.NewInt(0)     // in wei
-	// txOpts.GasLimit = uint64(300000) // in units
-	//txOpts.GasPrice = 0 // has to be 0 in quorum, apparently?
 
 	// Deploy the contract
 	address, tx, tokenContract, err := DeployMyToken(txOpts, client)
@@ -55,15 +48,6 @@ func MintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, 
 		return nil, nil, errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
 	}
 	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
-
-	// address := common.HexToAddress(addressHex)
-	// //storageInstance, err := NewStorage(address, client)
-	// tokenContract, err := NewMyToken(address, client)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// use the contract to mint the token
 
 	nonce++
 	txOpts.Nonce = big.NewInt(int64(nonce))
@@ -76,7 +60,10 @@ func MintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, 
 
 func mintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) (*big.Int, error) {
 
-	waitForContractAndMintToken(tokenContract, txOpts, purchasePrice)
+	err := waitForContractAndMintToken(tokenContract, txOpts, purchasePrice)
+	if err != nil {
+		return nil, err
+	}
 
 	tokenId, err := waitForTokenId(tokenContract)
 	if err != nil {
@@ -86,8 +73,21 @@ func mintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice 
 	return tokenId, nil
 }
 
+// The transaction to deploy the contract has to be mined by the
+// blockchain before we can use it. I'm sure there is a better way
+// to do this, but until I am more familiar with Go and the ABI
+// bindings, this will have to do.
 func waitForContractAndMintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) error {
 	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
+
+	numTries := 1
+	for err != nil && numTries < 5 {
+		numTries++
+		tx, err = tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
+		if err != nil {
+			time.Sleep(2 * time.Second)
+		}
+	}
 
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error setting value in contract: %v", err))
@@ -97,16 +97,7 @@ func waitForContractAndMintToken(tokenContract *MyToken, txOpts *bind.TransactOp
 	return err
 }
 
-// func withRetries(numRetries int, retriable func()) {
-// 	numTries := 0
-// 	for err != nil && numTries < numRetries {
-// 		err := retriable()
-// 		time.Sleep(2 * time.Second)
-// 		numTries++
-// 	}
-// }
-
-// The transaction to deploy the contract has to be mined by the 
+// The transaction to deploy the contract has to be mined by the
 // blockchain before we can use it. I'm sure there is a better way
 // to do this, but until I am more familiar with Go and the ABI
 // bindings, this will have to do.
