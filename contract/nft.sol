@@ -1,7 +1,6 @@
 pragma solidity >=0.5.0;
 
 import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
-//import "../node_modules/@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
 
 contract MyToken is ERC721 {
@@ -25,10 +24,6 @@ contract MyToken is ERC721 {
     }
 
     function safeMint(address to, uint256 monetaryValue) internal {
-        // testing something out...
-        _tokenIdCounter.increment();
-        _tokenIdCounter.increment();
-
         tokenId = _tokenIdCounter.current();
         purchasePrice = monetaryValue;
         _tokenIdCounter.increment();

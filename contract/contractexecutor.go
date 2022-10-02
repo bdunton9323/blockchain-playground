@@ -16,7 +16,7 @@ import (
 )
 
 // return (tokenId, token address, error)
-func MintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, *string, error) {
+func DeployContractAndMintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, *string, error) {
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
 		return nil, nil, errors.New(fmt.Sprintf("Error dialing the node: %v", err))
