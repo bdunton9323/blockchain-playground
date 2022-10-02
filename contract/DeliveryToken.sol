@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
 
-contract MyToken is ERC721 {
+contract DeliveryToken is ERC721 {
     event NftBought(address _seller, address _buyer, uint256 _price);
     event NFTMinted(uint256 _tokenId);
 
@@ -24,7 +24,7 @@ contract MyToken is ERC721 {
 
     string public URI = "https://example.com/metadata.json";
 
-    constructor() ERC721("MyToken", "MTK") public {
+    constructor() ERC721("DeliveryToken", "DLV") public {
         owner = msg.sender;
     }
 

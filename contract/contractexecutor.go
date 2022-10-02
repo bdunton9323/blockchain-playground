@@ -48,7 +48,7 @@ func DeployContractAndMintNFT(
 	txOpts.Nonce = big.NewInt(int64(nonce))
 
 	// Deploy the contract
-	address, tx, tokenContract, err := DeployMyToken(txOpts, client)
+	address, tx, tokenContract, err := DeployDeliveryToken(txOpts, client)
 	if err != nil {
 		return nil, nil, errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
 	}
@@ -63,7 +63,7 @@ func DeployContractAndMintNFT(
 }
 
 func mintToken(
-	tokenContract *MyToken,
+	tokenContract *DeliveryToken,
 	txOpts *bind.TransactOpts,
 	purchasePrice int64,
 	userAddress common.Address) (*big.Int, error) {
@@ -87,7 +87,7 @@ func mintToken(
 // to do this, but until I am more familiar with Go and the ABI
 // bindings, this will have to do.
 func waitForContractAndMintToken(
-	tokenContract *MyToken,
+	tokenContract *DeliveryToken,
 	txOpts *bind.TransactOpts,
 	purchasePrice int64,
 	userAddress common.Address) error {
@@ -115,7 +115,7 @@ func waitForContractAndMintToken(
 // blockchain before we can use it. I'm sure there is a better way
 // to do this, but until I am more familiar with Go and the ABI
 // bindings, this will have to do.
-func waitForTokenId(tokenContract *MyToken) (*big.Int, error) {
+func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 	tokenId, err := tokenContract.GetId(nil)
 	numTries := 1
 	for err != nil && numTries < 5 {
@@ -131,7 +131,7 @@ func waitForTokenId(tokenContract *MyToken) (*big.Int, error) {
 	return tokenId, nil
 }
 
-// func waitForEvent(contractInstance *MyToken) {
+// func waitForEvent(contractInstance *DeliveryToken) {
 // 	log.Info("Waiting for the emitted event")
 
 // 	var wg sync.WaitGroup
@@ -140,16 +140,16 @@ func waitForTokenId(tokenContract *MyToken) (*big.Int, error) {
 // 	wg.Wait()
 // }
 
-// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *MyToken) {
+// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *DeliveryToken) {
 // 	defer wg.Done()
 
-// 	events := make(chan *MyTokenNFTMinted)
+// 	events := make(chan *DeliveryTokenNFTMinted)
 // 	watchOpts := &bind.WatchOpts{
 // 		// TODO: if this is reading from the latest, is there a chance I will miss my event?
 // 		Start: nil,
 // 		Context: ctx,
 // 	}
-// 	subscription, err := contract.MyTokenFilterer.WatchNFTMinted(watchOpts, events)
+// 	subscription, err := contract.DeliveryTokenFilterer.WatchNFTMinted(watchOpts, events)
 // 	if err != nil {
 // 		log.Errorf("Could not watch for token minting event: %v", err)
 // 	}
@@ -194,7 +194,7 @@ func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
 
 	address := common.HexToAddress(addressHex)
 	//storageInstance, err := NewStorage(address, client)
-	contractInstance, err := NewMyToken(address, client)
+	contractInstance, err := NewDeliveryToken(address, client)
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
 	txOpts.Nonce = big.NewInt(int64(nonce))
 
 	address := common.HexToAddress(contractAddress)
-	contractInstance, err := NewMyToken(address, client)
+	contractInstance, err := NewDeliveryToken(address, client)
 	if err != nil {
 		return nil, err
 	}

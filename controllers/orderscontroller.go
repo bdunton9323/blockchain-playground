@@ -63,7 +63,7 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
 	// TODO: get the address from the database instead of the query
 	contractAddr := ctx.Query("address")
 
-	err := contract.BuyNFT(contractAddr, customerPrivateKey, nodeUrl)
+	err := contract.BuyNFT(contractAddr, customerPrivateKey, *_Controller.NodeUrl)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err.Error(),
