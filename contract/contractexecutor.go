@@ -158,7 +158,7 @@ func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 
 // }
 
-func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
+func BuyNFT(addressHex string, tokenId int64, privKeyHex string, nodeUrl string) error {
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error dialing the node: %v", err))
@@ -188,7 +188,9 @@ func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
 	auth := bind.NewKeyedTransactor(privKey)
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(1) // in wei
+
+	// TODO: get the price from the database
+	auth.Value = big.NewInt(0) // in wei
 	//auth.GasLimit = uint64(300000) // in units
 	// auth.GasPrice = gasPrice
 
@@ -200,9 +202,9 @@ func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
 	}
 
 	// TODO: get the token ID from somewhere
-	tx, err := contractInstance.Buy(auth, big.NewInt(3))
+	tx, err := contractInstance.Buy(auth, big.NewInt(tokenId))
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error setting value in contract: %v", err))
+		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
 
 	log.Infof("Tx sent with ID [%s]", tx.Hash().Hex())

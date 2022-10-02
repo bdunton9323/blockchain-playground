@@ -60,10 +60,11 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
 
 	log.Infof("Delivering order [%v]", orderId)
 
-	// TODO: get the address from the database instead of the query
+	// TODO: get the address and tokenId from the database instead of the query
 	contractAddr := ctx.Query("address")
+	tokenId, _ := strconv.ParseInt(ctx.Query("tokenId"), 10, 32)
 
-	err := contract.BuyNFT(contractAddr, customerPrivateKey, *_Controller.NodeUrl)
+	err := contract.BuyNFT(contractAddr, tokenId, customerPrivateKey, *_Controller.NodeUrl)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err.Error(),

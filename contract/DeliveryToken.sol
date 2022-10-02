@@ -40,7 +40,6 @@ contract DeliveryToken is ERC721 {
     }
 
     function mintToken(uint256 monetaryValue, address _allowedPurchaser) public payable {
-        require(monetaryValue != 0, "The token must have a price");
         require(minted == false, "A token has already been minted for this contract");
         safeMint(msg.sender, monetaryValue, _allowedPurchaser);
     }
@@ -57,7 +56,6 @@ contract DeliveryToken is ERC721 {
     function buy(uint256 _tokenId) external payable {
         require(msg.sender == allowedPurchaser, "Not an approved user");
         require(purchasePrice == msg.value, "Wrong purchase price");
-        require(purchasePrice != 0, "The token can only be bought once");
 
         address seller = ownerOf(_tokenId);
         require(msg.sender != seller, "You cannot buy the token from yourself");
