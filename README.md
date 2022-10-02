@@ -8,6 +8,7 @@ Install dependencies. From the root of the project:
 npm install @openzeppelin/contracts@3.4.2
 ```
 
+Build the contracts:
 ```
 # compile the contracts
 solc --allow-paths "$PWD/node_modules/@openzeppelin/" --abi contract/nft.sol -o contract/build
@@ -21,12 +22,12 @@ abigen --abi contract/build/MyToken.abi \
     --bin contract/build/MyToken.bin
 ```
 
-### Run directly
+### Run the microservice
 ```
 go run .
 ```
 
-### Build and run using docker
+## Build and run using docker
 ```
 docker compose up -d
 ```

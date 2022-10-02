@@ -13,6 +13,10 @@ func main() {
 
 	router := gin.Default()
 
+	router.POST("/order", func(ctx *gin.Context) {
+		controllers.DeployNFTContract(ctx, *privateKey)
+	})
+
 	// this is really just a hook for me to test
 	router.POST("/contract", func(ctx *gin.Context) {
 		controllers.DeployContract(ctx, *privateKey)

@@ -9,6 +9,36 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const nodeUrl = "http://172.13.3.1:8545"
+
+func DeployNFTContract(ctx *gin.Context, privateKey string) {
+	// TODO: inject the node URL from above somewhere. Private key can also be injected.
+	address, err := contract.DeployContract(privateKey, nodeUrl)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	contract.MintNFT(address, privateKey, nodeUrl)
+
+	// TODO: generate an order ID and associate it with the contract address
+
+	ctx.JSON(200, gin.H{
+		"address": address,
+		"tokenId": "1",
+	})
+}
+
+func BuyNFT(ctx *gin.Context, orderId string, privateKey string) {
+	orderId = ctx.Query("orderId")
+	// TODO: get the address from the database instead of the query
+	contractAddr := ctx.Query("address")
+
+	contract.BuyNFT(contractAddr, privateKey, nodeUrl)
+}
+
 func DeployContract(ctx *gin.Context, privateKey string) {
 	contractAddress, err := contract.InstallContract(privateKey)
 	if err != nil {
