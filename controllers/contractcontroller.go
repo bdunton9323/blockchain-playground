@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
@@ -19,7 +20,17 @@ func DeployContract(ctx *gin.Context, privateKey string) {
 }
 
 func ExecuteContract(ctx *gin.Context, privateKey string) {
-	contract.SetValue(big.NewInt(87), ctx.Query("address"), privateKey)
+	newValue := new(big.Int)
+	newValue, ok := newValue.SetString(ctx.Query("value"), 10)
+	if !ok {
+		ctx.JSON(400, gin.H{
+			"error": fmt.Sprintf("Invalid value: %s", ctx.Query("value")),
+		})
+	}
+	contract.SetValue(newValue, ctx.Query("address"), privateKey)
+	ctx.JSON(200, gin.H{
+		"value": fmt.Sprintf("%v", newValue),
+	})
 }
 
 func GetContractValue(ctx *gin.Context, privateKey string) {
