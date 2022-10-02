@@ -9,11 +9,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// TODO: inject the node URL from above somewhere. Private key can also be injected.
-const nodeUrl = "http://172.13.3.1:8545"
+type OrderController struct {
+	NodeUrl          *string
+	ServerPrivateKey *string
+}
 
 // Creates an order that can later be delivered
-func CreateOrder(ctx *gin.Context, privateKey string) {
+func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
 	price, err := strconv.ParseInt(ctx.Query("price"), 10, 64)
 	if err != nil {
@@ -25,7 +27,12 @@ func CreateOrder(ctx *gin.Context, privateKey string) {
 	// the user who is allowed to receive the shipment
 	userAddress := ctx.Query("address")
 
-	tokenId, address, err := contract.DeployContractAndMintNFT(privateKey, nodeUrl, price, userAddress)
+	tokenId, address, err := contract.DeployContractAndMintNFT(
+		*_Controller.ServerPrivateKey,
+		*_Controller.NodeUrl,
+		price,
+		userAddress)
+
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err.Error(),
@@ -42,7 +49,7 @@ func CreateOrder(ctx *gin.Context, privateKey string) {
 	})
 }
 
-func DeliverOrder(ctx *gin.Context) {
+func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
 	orderId := ctx.Param("orderId")
 
 	// the customer is signing for the order, and they have a different key than
@@ -68,11 +75,11 @@ func DeliverOrder(ctx *gin.Context) {
 	}
 }
 
-func GetOrderStatus(ctx *gin.Context, privateKey string) {
-	// TODO: this should only take in the order ID
+func (_Controller *OrderController) GetOrderStatus(ctx *gin.Context) {
+	// TODO: this should only take in the order ID and look up the contract in the DB
 	//orderId := ctx.Param("orderId")
 	contractAddress := ctx.Query("contract")
-	owner, err := contract.GetOwner(contractAddress, privateKey)
+	owner, err := contract.GetOwner(contractAddress, *_Controller.ServerPrivateKey)
 
 	if err != nil {
 		ctx.JSON(500, gin.H{
