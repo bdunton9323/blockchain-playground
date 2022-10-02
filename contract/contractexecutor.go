@@ -16,7 +16,12 @@ import (
 )
 
 // return (tokenId, token address, error)
-func DeployContractAndMintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, *string, error) {
+func DeployContractAndMintNFT(
+	privKeyHex string,
+	nodeUrl string,
+	purchasePrice int64,
+	userAddress string) (*big.Int, *string, error) {
+
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
 		return nil, nil, errors.New(fmt.Sprintf("Error dialing the node: %v", err))
@@ -51,16 +56,20 @@ func DeployContractAndMintNFT(privKeyHex string, nodeUrl string, purchasePrice i
 
 	nonce++
 	txOpts.Nonce = big.NewInt(int64(nonce))
-
-	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice)
+	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
 
 	contractAddress := address.Hex()
 	return tokenId, &contractAddress, nil
 }
 
-func mintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) (*big.Int, error) {
+func mintToken(
+	tokenContract *MyToken,
+	txOpts *bind.TransactOpts,
+	purchasePrice int64,
+	userAddress common.Address) (*big.Int, error) {
 
-	err := waitForContractAndMintToken(tokenContract, txOpts, purchasePrice)
+	log.Infof("Minting token to be purchased by [%v] for cost [%v]", userAddress.Hex(), purchasePrice)
+	err := waitForContractAndMintToken(tokenContract, txOpts, purchasePrice, userAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -77,13 +86,18 @@ func mintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice 
 // blockchain before we can use it. I'm sure there is a better way
 // to do this, but until I am more familiar with Go and the ABI
 // bindings, this will have to do.
-func waitForContractAndMintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) error {
-	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
+func waitForContractAndMintToken(
+	tokenContract *MyToken,
+	txOpts *bind.TransactOpts,
+	purchasePrice int64,
+	userAddress common.Address) error {
+
+	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice), userAddress)
 
 	numTries := 1
 	for err != nil && numTries < 5 {
 		numTries++
-		tx, err = tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
+		tx, err = tokenContract.MintToken(txOpts, big.NewInt(purchasePrice), userAddress)
 		if err != nil {
 			time.Sleep(2 * time.Second)
 		}
@@ -166,17 +180,17 @@ func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
 	if err != nil {
 		return err
 	}
-	gasPrice, err := client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return err
-	}
+	// gasPrice, err := client.SuggestGasPrice(context.Background())
+	// if err != nil {
+	// 	return err
+	// }
 
 	auth := bind.NewKeyedTransactor(privKey)
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Value = big.NewInt(0)     // in wei
-	auth.GasLimit = uint64(300000) // in units
-	auth.GasPrice = gasPrice
+	auth.Value = big.NewInt(1) // in wei
+	//auth.GasLimit = uint64(300000) // in units
+	// auth.GasPrice = gasPrice
 
 	address := common.HexToAddress(addressHex)
 	//storageInstance, err := NewStorage(address, client)
@@ -194,4 +208,46 @@ func BuyNFT(addressHex string, privKeyHex string, nodeUrl string) error {
 	log.Infof("Tx sent with ID [%s]", tx.Hash().Hex())
 
 	return nil
+}
+
+func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
+	client, err := ethclient.Dial("http://172.13.3.1:8545")
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Error dialing the node: %v", err))
+	}
+
+	privKey, err := crypto.HexToECDSA(privKeyHex)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey := privKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
+	}
+
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	txOpts := bind.NewKeyedTransactor(privKey)
+	txOpts.Nonce = big.NewInt(int64(nonce))
+
+	address := common.HexToAddress(contractAddress)
+	contractInstance, err := NewMyToken(address, client)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: get the token ID from somewhere
+	ownerAddress, err := contractInstance.GetOwner(nil)
+
+	if err != nil {
+		return nil, err
+	}
+	owner := ownerAddress.Hex()
+	return &owner, nil
 }

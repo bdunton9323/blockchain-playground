@@ -9,8 +9,13 @@ contract MyToken is ERC721 {
 
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIdCounter;
-    address owner;
 
+    // only one token can be minted from a single contract
+    bool minted = false;
+    // who is the current owner of the token?
+    address owner;
+    // only approved users can buy the token (accept delivery of shipment)
+    address allowedPurchaser;
     // (contract address, tokenId) form a globally unique key
     uint256 tokenId;
 
@@ -23,26 +28,34 @@ contract MyToken is ERC721 {
         owner = msg.sender;
     }
 
-    function safeMint(address to, uint256 monetaryValue) internal {
+    // the monetaryValue is the price that it costs to buy this token
+    function safeMint(address to, uint256 monetaryValue, address _allowedPurchaser) internal {
         tokenId = _tokenIdCounter.current();
+        minted = true;
         purchasePrice = monetaryValue;
+        allowedPurchaser = _allowedPurchaser;
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
         emit NFTMinted(tokenId);
     }
 
-    function mintToken(uint256 monetaryValue) public payable {
-        require(monetaryValue != 0, "Must have a nonzero value");
-        require(purchasePrice == 0, "A token has already been minted");
-        safeMint(msg.sender, monetaryValue);
+    function mintToken(uint256 monetaryValue, address _allowedPurchaser) public payable {
+        require(monetaryValue != 0, "The token must have a price");
+        require(minted == false, "A token has already been minted for this contract");
+        safeMint(msg.sender, monetaryValue, _allowedPurchaser);
     }
 
     function getId() public view returns (uint256) {
         return tokenId;
     }
 
+    function getOwner() public view returns (address) {
+        return owner;
+    }
+
     // buy this token from the owner (receive the physical goods the token represents)
     function buy(uint256 _tokenId) external payable {
+        require(msg.sender == allowedPurchaser, "Not an approved user");
         require(purchasePrice == msg.value, "Wrong purchase price");
         require(purchasePrice != 0, "The token can only be bought once");
 
@@ -61,7 +74,9 @@ contract MyToken is ERC721 {
         emit NftBought(seller, msg.sender, msg.value);
     }
 
-    // function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-    //     super._burn(tokenId);
-    // }
+    function _burn(uint256 _tokenId) internal override(ERC721) {
+        require(msg.sender == owner || msg.sender == allowedPurchaser, 
+                "Only the owner or allowed purchaser can destroy this contract");
+        super._burn(_tokenId);
+    }
 }
