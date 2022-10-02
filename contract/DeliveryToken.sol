@@ -1,9 +1,10 @@
 pragma solidity >=0.5.0;
 
 import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721Burnable.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
 
-contract DeliveryToken is ERC721 {
+contract DeliveryToken is ERC721, ERC721Burnable {
     event NftBought(address _seller, address _buyer, uint256 _price);
     event NFTMinted(uint256 _tokenId);
 
@@ -73,8 +74,7 @@ contract DeliveryToken is ERC721 {
     }
 
     function _burn(uint256 _tokenId) internal override(ERC721) {
-        require(msg.sender == owner || msg.sender == allowedPurchaser, 
-                "Only the owner or allowed purchaser can destroy this contract");
+        require(msg.sender == owner, "Only the owner can void the contract");
         super._burn(_tokenId);
     }
 }

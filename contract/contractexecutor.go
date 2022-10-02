@@ -253,3 +253,8 @@ func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
 	owner := ownerAddress.Hex()
 	return &owner, nil
 }
+
+func Burn() {
+	// TODO: verify that only the owner can burn this token
+	
+}
