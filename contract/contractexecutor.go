@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -66,25 +67,59 @@ func MintNFT(privKeyHex string, nodeUrl string, purchasePrice int64) (*big.Int, 
 
 	nonce++
 	txOpts.Nonce = big.NewInt(int64(nonce))
-	tx, err = tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
-	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Error setting value in contract: %v", err))
-	}
-	log.Infof("Tx sent with ID [%s] to mint a token", tx.Hash().Hex())
 
-	tokenId, err := waitForTokenId(tokenContract)
-	if err != nil {
-		return nil, nil, err
-	}
+	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice)
 
 	contractAddress := address.Hex()
 	return tokenId, &contractAddress, nil
 }
 
+func mintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) (*big.Int, error) {
+
+	waitForContractAndMintToken(tokenContract, txOpts, purchasePrice)
+
+	tokenId, err := waitForTokenId(tokenContract)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenId, nil
+}
+
+func waitForContractAndMintToken(tokenContract *MyToken, txOpts *bind.TransactOpts, purchasePrice int64) error {
+	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice))
+
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error setting value in contract: %v", err))
+	}
+	log.Infof("Tx sent with ID [%s] to mint a token", tx.Hash().Hex())
+
+	return err
+}
+
+// func withRetries(numRetries int, retriable func()) {
+// 	numTries := 0
+// 	for err != nil && numTries < numRetries {
+// 		err := retriable()
+// 		time.Sleep(2 * time.Second)
+// 		numTries++
+// 	}
+// }
+
+// The transaction to deploy the contract has to be mined by the 
+// blockchain before we can use it. I'm sure there is a better way
+// to do this, but until I am more familiar with Go and the ABI
+// bindings, this will have to do.
 func waitForTokenId(tokenContract *MyToken) (*big.Int, error) {
 	tokenId, err := tokenContract.GetId(nil)
+	numTries := 1
+	for err != nil && numTries < 5 {
+		time.Sleep(2 * time.Second)
+		numTries++
+		tokenId, err = tokenContract.GetId(nil)
+	}
 	if err != nil {
-		log.Errorf("Error getting token ID: %v", err)
+		log.Errorf("Error getting token ID. The transaction may not have been mined. %v", err)
 		return nil, err
 	}
 

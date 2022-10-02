@@ -15,14 +15,6 @@ const nodeUrl = "http://172.13.3.1:8545"
 
 func DeployNFTContract(ctx *gin.Context, privateKey string) {
 
-	// address, err := contract.DeployContract(privateKey, nodeUrl)
-	// if err != nil {
-	// 	ctx.JSON(500, gin.H{
-	// 		"error": err.Error(),
-	// 	})
-	// 	return
-	// }
-
 	i, err := strconv.ParseInt(ctx.Query("price"), 10, 64)
 	if err != nil {
 		ctx.JSON(400, gin.H{
