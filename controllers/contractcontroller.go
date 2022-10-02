@@ -3,31 +3,44 @@ package controllers
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
 
+// TODO: inject the node URL from above somewhere. Private key can also be injected.
 const nodeUrl = "http://172.13.3.1:8545"
 
 func DeployNFTContract(ctx *gin.Context, privateKey string) {
-	// TODO: inject the node URL from above somewhere. Private key can also be injected.
-	address, err := contract.DeployContract(privateKey, nodeUrl)
+
+	// address, err := contract.DeployContract(privateKey, nodeUrl)
+	// if err != nil {
+	// 	ctx.JSON(500, gin.H{
+	// 		"error": err.Error(),
+	// 	})
+	// 	return
+	// }
+
+	i, err := strconv.ParseInt(ctx.Query("price"), 10, 64)
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"error": "Price value must be integer",
+		})
+	}
+	tokenId, address, err := contract.MintNFT(privateKey, nodeUrl, i)
 	if err != nil {
 		ctx.JSON(500, gin.H{
-			"error": err.Error(),
+			"error": err,
 		})
-		return
 	}
-
-	contract.MintNFT(address, privateKey, nodeUrl)
 
 	// TODO: generate an order ID and associate it with the contract address
 
 	ctx.JSON(200, gin.H{
 		"address": address,
-		"tokenId": "1",
+		"tokenId": tokenId,
 	})
 }
 
@@ -38,6 +51,8 @@ func BuyNFT(ctx *gin.Context, orderId string, privateKey string) {
 
 	contract.BuyNFT(contractAddr, privateKey, nodeUrl)
 }
+
+// Old stuff below:
 
 func DeployContract(ctx *gin.Context, privateKey string) {
 	contractAddress, err := contract.InstallContract(privateKey)
