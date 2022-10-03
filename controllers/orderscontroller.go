@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
+	"github.com/bdunton9323/blockchain-playground/orders"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -12,6 +13,7 @@ import (
 type OrderController struct {
 	NodeUrl          *string
 	ServerPrivateKey *string
+	OrderRepository  *orders.MariaDBOrderRepository
 }
 
 // Creates an order that can later be delivered
@@ -22,6 +24,15 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		ctx.JSON(400, gin.H{
 			"error": "Price value must be integer",
 		})
+		return
+	}
+
+	itemId := ctx.Query("itemId")
+	if len(itemId) == 0 {
+		ctx.JSON(400, gin.H{
+			"error": "itemId was not given",
+		})
+		return
 	}
 
 	// the user who is allowed to receive the shipment
@@ -39,13 +50,28 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		})
 	}
 
-	// TODO: store the contract, tokenId, and orderId in the database
-	orderId := uuid.New()
+	order := &orders.Order{
+		OrderId:      uuid.New().String(),
+		ItemId:       itemId,
+		ItemName:     "socks",
+		Price:        price,
+		TokenAddress: *address,
+		TokenId:      tokenId.Int64(),
+		Delivered:    false,
+	}
 
+	err = _Controller.OrderRepository.CreateOrder(order)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Error writing order to database",
+		})
+		return
+	}
 	ctx.JSON(200, gin.H{
-		"address": address,
-		"tokenId": tokenId,
-		"orderId": orderId.String(),
+		"address":         address,
+		"tokenId":         tokenId,
+		"contractAddress": address,
+		"orderId":         order.OrderId,
 	})
 }
 

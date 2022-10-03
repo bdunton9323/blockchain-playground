@@ -4,21 +4,31 @@ import (
 	"flag"
 
 	"github.com/bdunton9323/blockchain-playground/controllers"
+	"github.com/bdunton9323/blockchain-playground/orders"
 	"github.com/gin-gonic/gin"
 )
 
-var nodeUrl = "http://172.13.3.1:8545"
+var ethNodeUrl = "http://172.13.3.1:8545"
+var dbHost = "127.0.0.1:3306"
+var dbName = "orderdb"
+var dbUser = "db_user"
+var dbPassword = "mysqlPassword"
 
 func main() {
 	privateKey := flag.String("privatekey", "", "The private key of the vendor")
 	flag.Parse()
 
-	router := gin.Default()
+	orderRepo, err := orders.NewMariaDBOrderRepository(dbHost, dbName, dbUser, dbPassword)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	var orderController *controllers.OrderController = new(controllers.OrderController)
 	orderController.ServerPrivateKey = privateKey
-	orderController.NodeUrl = &nodeUrl
+	orderController.NodeUrl = &ethNodeUrl
+	orderController.OrderRepository = orderRepo
 
+	router := gin.Default()
 	router.POST("/order", func(ctx *gin.Context) {
 		orderController.CreateOrder(ctx)
 	})
