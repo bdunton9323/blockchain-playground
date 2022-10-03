@@ -38,8 +38,8 @@ func main() {
 		orderController.DeliverOrder(ctx)
 	})
 
-	router.GET("/order/:orderId", func(ctx *gin.Context) {
-		orderController.GetOrderStatus(ctx)
+	router.GET("/order/:orderId/owner", func(ctx *gin.Context) {
+		orderController.GetDeliveryTokenOwner(ctx)
 	})
 
 	router.Run(":3000")

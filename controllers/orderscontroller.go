@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
 	"github.com/bdunton9323/blockchain-playground/orders"
@@ -19,14 +19,6 @@ type OrderController struct {
 // Creates an order that can later be delivered
 func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
-	price, err := strconv.ParseInt(ctx.Query("price"), 10, 64)
-	if err != nil {
-		ctx.JSON(400, gin.H{
-			"error": "Price value must be integer",
-		})
-		return
-	}
-
 	itemId := ctx.Query("itemId")
 	if len(itemId) == 0 {
 		ctx.JSON(400, gin.H{
@@ -38,6 +30,8 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	// the user who is allowed to receive the shipment
 	userAddress := ctx.Query("buyerAddress")
 
+	// make up a price since there is no database of inventory
+	price := int64(5)
 	tokenId, address, err := contract.DeployContractAndMintNFT(
 		*_Controller.ServerPrivateKey,
 		*_Controller.NodeUrl,
@@ -116,11 +110,18 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
 	return nil
 }
 
-func (_Controller *OrderController) GetOrderStatus(ctx *gin.Context) {
-	// TODO: this should only take in the order ID and look up the contract in the DB
-	//orderId := ctx.Param("orderId")
-	contractAddress := ctx.Query("contract")
-	owner, err := contract.GetOwner(contractAddress, *_Controller.ServerPrivateKey)
+// Determines who currently owns the deliver token - the vendor or the customer.
+// Returns the owner's address.
+func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
+	orderId := ctx.Param("orderId")
+	order, err := _Controller.OrderRepository.GetOrder(orderId)
+	if err != nil || order == nil {
+		ctx.JSON(400, gin.H{
+			"error": fmt.Sprintf("Order ID [%s] does not exist", orderId),
+		})
+	}
+
+	owner, err := contract.GetOwner(order.TokenAddress, *_Controller.ServerPrivateKey)
 
 	if err != nil {
 		ctx.JSON(500, gin.H{
