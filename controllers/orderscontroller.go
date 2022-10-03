@@ -75,31 +75,43 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	})
 }
 
-func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
-	orderId := ctx.Param("orderId")
-
-	// the customer is signing for the order, and they have a different key than
+func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
+	// The customer is signing for the order, and they have a different key than
 	// the one loaded into the server. I recognize that transmitting the private
-	// key to a server is not a good idea, but with a lack of time it demonstrates
-	// the functionality.
+	// key to a server is a terrible idea, but given the lack of time, it at least
+	// demonstrates the smart contract's functionality.
 	customerPrivateKey := ctx.Query("customerKey")
 
+	orderId := ctx.Param("orderId")
 	log.Infof("Delivering order [%v]", orderId)
 
-	// TODO: get the address and tokenId from the database instead of the query
-	contractAddr := ctx.Query("address")
-	tokenId, _ := strconv.ParseInt(ctx.Query("tokenId"), 10, 32)
-
-	err := contract.BuyNFT(contractAddr, tokenId, customerPrivateKey, *_Controller.NodeUrl)
+	order, err := _Controller.OrderRepository.GetOrder(orderId)
 	if err != nil {
 		ctx.JSON(500, gin.H{
 			"error": err.Error(),
 		})
-	} else {
-		ctx.JSON(200, gin.H{
-			"status": "delivered",
+		return err
+	} else if order == nil {
+		ctx.JSON(400, gin.H{
+			"error": "Could not find that order ID",
 		})
+		return nil
 	}
+
+	// buy the token from the vendor, thereby accepting delivery of the package
+	err = contract.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, *_Controller.NodeUrl)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": err.Error(),
+		})
+		return err
+	}
+
+	ctx.JSON(200, gin.H{
+		"status": "delivered",
+	})
+
+	return nil
 }
 
 func (_Controller *OrderController) GetOrderStatus(ctx *gin.Context) {

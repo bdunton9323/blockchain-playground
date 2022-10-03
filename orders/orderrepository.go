@@ -65,10 +65,16 @@ func NewMariaDBOrderRepository(host string, dbName string, username string, pass
 
 func (repo *MariaDBOrderRepository) GetOrder(orderId string) (*Order, error) {
 	// I know this is vulnerable to SQL injection, but it's fine for the demo
-	results, err := repo.conn.Query(fmt.Sprintf("select %s from %s where order_id = %s",
-		allFields, ordersTable, orderId))
+	query := fmt.Sprintf("select %s from %s where order_id = '%s'",
+		allFields, ordersTable, orderId)
+
+	results, err := repo.runQuery(query)
 	if err != nil {
 		return nil, err
+	}
+
+	if !results.Next() {
+		return nil, nil
 	}
 
 	var order Order
@@ -107,14 +113,17 @@ func (repo *MariaDBOrderRepository) CreateOrder(order *Order) error {
 	query := fmt.Sprintf("insert into orders (%s) values('%s')",
 		allFields, strings.Join(values, "','"))
 
-	log.Debugf("running query [%s]", query)
-
-	insert, err := repo.conn.Query(query)
+	insert, err := repo.runQuery(query)
 	if err != nil {
-		log.Debugf("query returned error: %v", err)
+		log.Errorf("query returned error: %v", err)
 		return err
 	}
 	insert.Close()
 
 	return nil
+}
+
+func (repo *MariaDBOrderRepository) runQuery(query string) (*sql.Rows, error) {
+	log.Infof("running query [%s]", query)
+	return repo.conn.Query(query)
 }
