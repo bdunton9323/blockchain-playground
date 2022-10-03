@@ -8,7 +8,19 @@ services:
     volumes:
       - ~/apps/mariadb:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_PASSWORD=mysqlPassword
-      - MYSQL_USER=db_user
-      - MYSQL_DATABASE=blockchain_db
+      MYSQL_ROOT_PASSWORD: "root"
+      MYSQL_PASSWORD: "mysqlPassword"
+      MYSQL_USER: "db_user"
+      MYSQL_DATABASE: "orderdb"
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: true
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+  flyway:
+    image: boxfuse/flyway:latest
+    command: migrate -url=jdbc:mysql://mariadb:3306/orderdb -user=root -password=root -connectRetries=90
+    volumes:
+      - ${PWD}/database/migrations:/flyway/sql
+    depends_on:
+      - mariadb
