@@ -36,7 +36,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	}
 
 	// the user who is allowed to receive the shipment
-	userAddress := ctx.Query("address")
+	userAddress := ctx.Query("buyerAddress")
 
 	tokenId, address, err := contract.DeployContractAndMintNFT(
 		*_Controller.ServerPrivateKey,
@@ -91,9 +91,9 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
 			"error": err.Error(),
 		})
 		return err
-	} else if order == nil {
+	} else if order == nil || order.Delivered {
 		ctx.JSON(400, gin.H{
-			"error": "Could not find that order ID",
+			"error": "Could not find that order ID. Has it already been delivered?",
 		})
 		return nil
 	}
@@ -106,6 +106,8 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
 		})
 		return err
 	}
+
+	_Controller.OrderRepository.MarkOrderDelivered(orderId)
 
 	ctx.JSON(200, gin.H{
 		"status": "delivered",

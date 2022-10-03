@@ -10,13 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type OrderDB struct {
-	url      string
-	dbName   string
-	username string
-	password string
-}
-
 type Order struct {
 	OrderId      string
 	ItemId       string
@@ -30,7 +23,7 @@ type Order struct {
 type OrderRepository interface {
 	GetOrder(orderId string) (*Order, error)
 	CreateOrder(order *Order) (string, error)
-	UpdateOrder(orderId string, order *Order) error
+	MarkOrderDelivered(orderId string) error
 }
 
 type MariaDBOrderRepository struct {
@@ -120,6 +113,15 @@ func (repo *MariaDBOrderRepository) CreateOrder(order *Order) error {
 	}
 	insert.Close()
 
+	return nil
+}
+
+func (repo *MariaDBOrderRepository) MarkOrderDelivered(orderId string) error {
+	query := fmt.Sprintf("update orders set delivered = '1' where order_id = '%s'", orderId)
+	_, err := repo.runQuery(query)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
