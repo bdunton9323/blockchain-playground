@@ -14,11 +14,11 @@ import (
 // The controller itself
 type OrderController struct {
 	// the URL of the ethereum node to connect to
-	NodeUrl          string
+	NodeUrl string
 	// the private key of the server's ethereum address
 	ServerPrivateKey string
 	// the persistence layer for the orders
-	OrderRepository  *orders.MariaDBOrderRepository
+	OrderRepository *orders.MariaDBOrderRepository
 	// executes operations on the smart delivery contract
 	ContractExecutor *contract.DeliveryContractExecutor
 }
@@ -154,7 +154,7 @@ func (_Controller *OrderController) UpdateOrderStatus(ctx *gin.Context) {
 // @Tags         order
 // @Accept       json
 // @Produce      json
-// @Param        orderId        path   string    true  "the ID of the order being updated"
+// @Param        orderId        path   string    true  "the ID of the order to look up"
 // @Success      200  {object}  TokenOwnerResponse
 // @Failure      400  {object}  ApiError
 // @Failure      404  {object}  ApiError
@@ -169,7 +169,7 @@ func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
 		return
 	}
 
-	owner, err := contract.GetOwner(order.TokenAddress, _Controller.ServerPrivateKey)
+	owner, err := _Controller.ContractExecutor.GetOwner(order.TokenAddress, _Controller.ServerPrivateKey)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -210,7 +210,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = contract.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, _Controller.NodeUrl)
+	err = _Controller.ContractExecutor.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, _Controller.NodeUrl)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),

@@ -164,50 +164,43 @@ func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 
 // }
 
-func BuyNFT(addressHex string, tokenId int64, privKeyHex string, nodeUrl string) error {
+func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, buyerPrivateKey string, nodeUrl string) error {
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error dialing the node: %v", err))
 	}
 
-	privKey, err := crypto.HexToECDSA(privKeyHex)
+	privKey, err := crypto.HexToECDSA(buyerPrivateKey)
 	if err != nil {
 		return err
 	}
 
-	publicKey := privKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
-	}
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	nonce, err := _exec.getNonce(privKey)
 	if err != nil {
 		return err
 	}
+
+	txOpts := bind.NewKeyedTransactor(privKey)
+	txOpts.Nonce = nonce
+
+	// the amount of Ether being sent in the request
+	txOpts.Value = big.NewInt(0) // in wei
+	
+	// Quorum is gasless, so this doesn't work there
 	// gasPrice, err := client.SuggestGasPrice(context.Background())
 	// if err != nil {
 	// 	return err
 	// }
-
-	auth := bind.NewKeyedTransactor(privKey)
-	auth.Nonce = big.NewInt(int64(nonce))
-	auth.Nonce = big.NewInt(int64(nonce))
-
-	// TODO: get the price from the database
-	auth.Value = big.NewInt(0) // in wei
-	//auth.GasLimit = uint64(300000) // in units
-	// auth.GasPrice = gasPrice
+	// txOpts.GasLimit = uint64(300000) // in gas units
+	// txOpts.GasPrice = gasPrice
 
 	address := common.HexToAddress(addressHex)
-	//storageInstance, err := NewStorage(address, client)
 	contractInstance, err := NewDeliveryToken(address, client)
 	if err != nil {
 		return err
 	}
 
-	tx, err := contractInstance.Buy(auth)
+	tx, err := contractInstance.Buy(txOpts)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
@@ -217,34 +210,18 @@ func BuyNFT(addressHex string, tokenId int64, privKeyHex string, nodeUrl string)
 	return nil
 }
 
-func GetOwner(contractAddress string, privKeyHex string) (string, error) {
-	client, err := ethclient.Dial("http://172.13.3.1:8545")
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("Error dialing the node: %v", err))
-	}
+func (_exec *DeliveryContractExecutor) GetOwner(contractAddress string, privKeyHex string) (string, error) {
 
-	privKey, err := crypto.HexToECDSA(privKeyHex)
+	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
 		return "", err
 	}
 
-	publicKey := privKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return "", errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
-	}
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		return "", err
-	}
-
-	txOpts := bind.NewKeyedTransactor(privKey)
-	txOpts.Nonce = big.NewInt(int64(nonce))
+	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
+	txOpts.Nonce = nonce
 
 	address := common.HexToAddress(contractAddress)
-	contractInstance, err := NewDeliveryToken(address, client)
+	contractInstance, err := NewDeliveryToken(address, _exec.Client)
 	if err != nil {
 		return "", err
 	}
