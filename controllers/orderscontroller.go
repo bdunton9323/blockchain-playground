@@ -235,7 +235,7 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	err := contract.BurnContract(order.TokenAddress, _Controller.ServerPrivateKey)
+	err := _Controller.ContractExecutor.BurnContract(order.TokenAddress, _Controller.ServerPrivateKey)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: "Failed to cancel the order",

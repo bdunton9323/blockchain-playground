@@ -113,6 +113,8 @@ func waitForContractAndMintToken(
 	}
 	log.Infof("Tx sent with ID [%s] to mint a token", tx.Hash().Hex())
 
+	waitForMint(tokenContract)
+
 	return err
 }
 
@@ -135,31 +137,6 @@ func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 
 	return tokenId, nil
 }
-
-// func waitForEvent(contractInstance *DeliveryToken) {
-// 	log.Info("Waiting for the emitted event")
-
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	go listenForMintedEvent(context.Background(), &wg, contractInstance)
-// 	wg.Wait()
-// }
-
-// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *DeliveryToken) {
-// 	defer wg.Done()
-
-// 	events := make(chan *DeliveryTokenNFTMinted)
-// 	watchOpts := &bind.WatchOpts{
-// 		// TODO: if this is reading from the latest, is there a chance I will miss my event?
-// 		Start: nil,
-// 		Context: ctx,
-// 	}
-// 	subscription, err := contract.DeliveryTokenFilterer.WatchNFTMinted(watchOpts, events)
-// 	if err != nil {
-// 		log.Errorf("Could not watch for token minting event: %v", err)
-// 	}
-// 	defer subscription.Unsubscribe()
-// }
 
 // Purches the token from the owner
 func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, buyerPrivateKey string, nodeUrl string) error {
@@ -276,3 +253,34 @@ func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*
 
 	return big.NewInt(int64(nonce)), nil
 }
+
+// There is some functionalilty in the ABI bindings for subscribing to an events channel to watch for events
+// emitted from the blockchain. It is not supported with the RPC connection interface I am using, since there
+// is no long-lived connection there. I am leaving the code here regardless.
+// ----
+//
+// func waitForMint(contractInstance *DeliveryToken) {
+// 	log.Info("Waiting for the emitted event")
+//
+// 	var wg sync.WaitGroup
+// 	wg.Add(1)
+// 	go listenForMintedEvent(context.Background(), &wg, contractInstance)
+// 	wg.Wait()
+// }
+//
+// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *DeliveryToken) {
+// 	defer wg.Done()
+//
+// 	events := make(chan *DeliveryTokenNFTMinted)
+//
+// 	start := uint64(0)
+// 	watchOpts := &bind.WatchOpts{
+// 		Start: &start,
+// 		Context: ctx,
+// 	}
+// 	subscription, err := contract.DeliveryTokenFilterer.WatchNFTMinted(watchOpts, events)
+// 	if err != nil {
+// 		log.Errorf("Could not watch for token minting event: %v", err)
+// 	}
+// 	defer subscription.Unsubscribe()
+// }
