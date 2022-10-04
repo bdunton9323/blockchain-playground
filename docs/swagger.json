@@ -25,7 +25,7 @@
                 "tags": [
                     "order"
                 ],
-                "summary": "ping example",
+                "summary": "Create order",
                 "parameters": [
                     {
                         "type": "string",
@@ -69,6 +69,121 @@
                     }
                 }
             }
+        },
+        "/order/{orderId}": {
+            "post": {
+                "description": "This action changes the status of an order, either by accepting delivery or canceling it",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "Update order status",
+                "parameters": [
+                    {
+                        "description": "Indicates the status of the order. One of ('canceled', 'delivered')",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.OrderUpdateRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "If this is a delivery, the delivery recipient's private key (not a good idea in real life!)",
+                        "name": "customerKey",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "the ID of the order being updated",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.OrderStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/order/{orderId}/owner": {
+            "get": {
+                "description": "Determines who currently owns the deliver token - the vendor or the customer.\nThis looks up the contract in the blockchain rather than reading the status from the database.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "Get the current owner of the delivery contract token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "the ID of the order being updated",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.TokenOwnerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -89,11 +204,36 @@
                 "contractAddress": {
                     "type": "string"
                 },
-                "orderId": {
+                "message": {
                     "type": "string"
                 },
-                "tokenId": {
+                "orderId": {
                     "type": "string"
+                }
+            }
+        },
+        "controllers.OrderStatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.OrderUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "controllers.TokenOwnerResponse": {
+            "type": "object",
+            "properties": {
+                "owner": {
+                    "type": "string",
+                    "format": "address"
                 }
             }
         }

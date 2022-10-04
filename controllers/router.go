@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"strings"
-
 	_ "github.com/bdunton9323/blockchain-playground/docs"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"     // swagger embed files
@@ -36,18 +34,7 @@ func (_apiRouter *ApiRouter) Start() {
 	})
 
 	router.POST("/api/v1/order/:orderId", func(ctx *gin.Context) {
-		var req OrderUpdateRequest
-		ctx.BindJSON(&req)
-
-		if strings.EqualFold(req.Status, "delivered") {
-			_apiRouter.orderController.DeliverOrder(ctx)
-		} else if strings.EqualFold(req.Status, "canceled") {
-			_apiRouter.orderController.CancelOrder(ctx)
-		} else {
-			ctx.JSON(400, gin.H{
-				"error": "Invalid status. Expected 'delivered' or 'canceled'",
-			})
-		}
+		_apiRouter.orderController.UpdateOrderStatus(ctx)
 	})
 
 	router.GET("/api/v1/order/:orderId/owner", func(ctx *gin.Context) {

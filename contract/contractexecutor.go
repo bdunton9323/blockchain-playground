@@ -211,27 +211,27 @@ func BuyNFT(addressHex string, tokenId int64, privKeyHex string, nodeUrl string)
 	return nil
 }
 
-func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
+func GetOwner(contractAddress string, privKeyHex string) (string, error) {
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing the node: %v", err))
+		return "", errors.New(fmt.Sprintf("Error dialing the node: %v", err))
 	}
 
 	privKey, err := crypto.HexToECDSA(privKeyHex)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	publicKey := privKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
+		return "", errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	txOpts := bind.NewKeyedTransactor(privKey)
@@ -240,16 +240,16 @@ func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
 	address := common.HexToAddress(contractAddress)
 	contractInstance, err := NewDeliveryToken(address, client)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	ownerAddress, err := contractInstance.GetOwner(nil)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	owner := ownerAddress.Hex()
-	return &owner, nil
+	return owner, nil
 }
 
 func BurnContract(contractAddress string, privKeyHex string) error {

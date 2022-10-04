@@ -11,9 +11,25 @@ definitions:
         type: string
       contractAddress:
         type: string
+      message:
+        type: string
       orderId:
         type: string
-      tokenId:
+    type: object
+  controllers.OrderStatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  controllers.OrderUpdateRequest:
+    properties:
+      status:
+        type: string
+    type: object
+  controllers.TokenOwnerResponse:
+    properties:
+      owner:
+        format: address
         type: string
     type: object
 host: localhost:8080
@@ -61,7 +77,87 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/controllers.ApiError'
-      summary: ping example
+      summary: Create order
+      tags:
+      - order
+  /order/{orderId}:
+    post:
+      consumes:
+      - application/json
+      description: This action changes the status of an order, either by accepting
+        delivery or canceling it
+      parameters:
+      - description: Indicates the status of the order. One of ('canceled', 'delivered')
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.OrderUpdateRequest'
+      - description: If this is a delivery, the delivery recipient's private key (not
+          a good idea in real life!)
+        in: query
+        name: customerKey
+        type: string
+      - description: the ID of the order being updated
+        in: path
+        name: orderId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.OrderStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+      summary: Update order status
+      tags:
+      - order
+  /order/{orderId}/owner:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Determines who currently owns the deliver token - the vendor or the customer.
+        This looks up the contract in the blockchain rather than reading the status from the database.
+      parameters:
+      - description: the ID of the order being updated
+        in: path
+        name: orderId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.TokenOwnerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controllers.ApiError'
+      summary: Get the current owner of the delivery contract token
       tags:
       - order
 swagger: "2.0"
