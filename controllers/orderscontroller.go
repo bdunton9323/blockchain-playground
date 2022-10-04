@@ -12,9 +12,13 @@ import (
 )
 
 type OrderController struct {
-	NodeUrl          *string
-	ServerPrivateKey *string
+	NodeUrl          string
+	ServerPrivateKey string
 	OrderRepository  *orders.MariaDBOrderRepository
+}
+
+type OrderUpdateRequest struct {
+	Status string
 }
 
 // Creates an order that can later be delivered
@@ -38,8 +42,8 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	// make up a price since there is no database of inventory
 	price := int64(0)
 	tokenId, address, err := contract.DeployContractAndMintNFT(
-		*_Controller.ServerPrivateKey,
-		*_Controller.NodeUrl,
+		_Controller.ServerPrivateKey,
+		_Controller.NodeUrl,
 		price,
 		userAddress)
 
@@ -95,7 +99,7 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = contract.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, *_Controller.NodeUrl)
+	err = contract.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, _Controller.NodeUrl)
 	if err != nil {
 		errorResponse(ctx, 500, err.Error())
 		return
@@ -121,7 +125,7 @@ func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
 		return
 	}
 
-	owner, err := contract.GetOwner(order.TokenAddress, *_Controller.ServerPrivateKey)
+	owner, err := contract.GetOwner(order.TokenAddress, _Controller.ServerPrivateKey)
 
 	if err != nil {
 		errorResponse(ctx, 500, err.Error())
@@ -140,7 +144,7 @@ func (_Controller *OrderController) CancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	err := contract.BurnContract(order.TokenAddress, *_Controller.ServerPrivateKey)
+	err := contract.BurnContract(order.TokenAddress, _Controller.ServerPrivateKey)
 	if err != nil {
 		errorResponse(ctx, 500, "Failed to cancel the order")
 	}
