@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
 	"github.com/bdunton9323/blockchain-playground/orders"
@@ -19,6 +20,10 @@ type OrderController struct {
 // Creates an order that can later be delivered
 func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
+	if !validateArgs(ctx, "itemId", "buyerAddress") {
+		return
+	}
+
 	itemId := ctx.Query("itemId")
 	if len(itemId) == 0 {
 		ctx.JSON(400, gin.H{
@@ -31,7 +36,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	userAddress := ctx.Query("buyerAddress")
 
 	// make up a price since there is no database of inventory
-	price := int64(5)
+	price := int64(0)
 	tokenId, address, err := contract.DeployContractAndMintNFT(
 		*_Controller.ServerPrivateKey,
 		*_Controller.NodeUrl,
@@ -39,9 +44,8 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		userAddress)
 
 	if err != nil {
-		ctx.JSON(500, gin.H{
-			"error": err.Error(),
-		})
+		errorResponse(ctx, 500, err.Error())
+		return
 	}
 
 	order := &orders.Order{
@@ -56,9 +60,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
 	err = _Controller.OrderRepository.CreateOrder(order)
 	if err != nil {
-		ctx.JSON(500, gin.H{
-			"error": "Error writing order to database",
-		})
+		errorResponse(ctx, 500, "Error writing order to database")
 		return
 	}
 	ctx.JSON(200, gin.H{
@@ -69,7 +71,11 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	})
 }
 
-func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
+func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) {
+	if !validateArgs(ctx, "customerKey") {
+		return
+	}
+
 	// The customer is signing for the order, and they have a different key than
 	// the one loaded into the server. I recognize that transmitting the private
 	// key to a server is a terrible idea, but given the lack of time, it at least
@@ -81,24 +87,18 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
 
 	order, err := _Controller.OrderRepository.GetOrder(orderId)
 	if err != nil {
-		ctx.JSON(500, gin.H{
-			"error": err.Error(),
-		})
-		return err
+		errorResponse(ctx, 500, err.Error())
+		return
 	} else if order == nil || order.Delivered {
-		ctx.JSON(400, gin.H{
-			"error": "Could not find that order ID. Has it already been delivered?",
-		})
-		return nil
+		orderNotFoundResponse(ctx, orderId)
+		return
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
 	err = contract.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, *_Controller.NodeUrl)
 	if err != nil {
-		ctx.JSON(500, gin.H{
-			"error": err.Error(),
-		})
-		return err
+		errorResponse(ctx, 500, err.Error())
+		return
 	}
 
 	_Controller.OrderRepository.MarkOrderDelivered(orderId)
@@ -107,29 +107,74 @@ func (_Controller *OrderController) DeliverOrder(ctx *gin.Context) error {
 		"status": "delivered",
 	})
 
-	return nil
+	return
 }
 
 // Determines who currently owns the deliver token - the vendor or the customer.
 // Returns the owner's address.
 func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
+
 	orderId := ctx.Param("orderId")
-	order, err := _Controller.OrderRepository.GetOrder(orderId)
-	if err != nil || order == nil {
-		ctx.JSON(400, gin.H{
-			"error": fmt.Sprintf("Order ID [%s] does not exist", orderId),
-		})
+	order, _ := _Controller.OrderRepository.GetOrder(orderId)
+	if order == nil {
+		orderNotFoundResponse(ctx, orderId)
+		return
 	}
 
 	owner, err := contract.GetOwner(order.TokenAddress, *_Controller.ServerPrivateKey)
 
 	if err != nil {
-		ctx.JSON(500, gin.H{
-			"error": err.Error(),
-		})
+		errorResponse(ctx, 500, err.Error())
 	} else {
 		ctx.JSON(200, gin.H{
 			"owner": owner,
 		})
 	}
+}
+
+func (_Controller *OrderController) CancelOrder(ctx *gin.Context) {
+	orderId := ctx.Param("orderId")
+	order, _ := _Controller.OrderRepository.GetOrder(orderId)
+	if order == nil {
+		orderNotFoundResponse(ctx, orderId)
+		return
+	}
+
+	err := contract.BurnContract(order.TokenAddress, *_Controller.ServerPrivateKey)
+	if err != nil {
+		errorResponse(ctx, 500, "Failed to cancel the order")
+	}
+}
+
+func validateArgs(ctx *gin.Context, args ...string) bool {
+	var sb strings.Builder
+
+	valid := true
+	first := true
+	for _, arg := range args {
+		if len(ctx.Query(arg)) == 0 {
+			valid = false
+			if !first {
+				sb.WriteString(",")
+			}
+			sb.WriteString(arg)
+			first = false
+		}
+	}
+
+	if !valid {
+		errorResponse(ctx, 400, sb.String())
+		return false
+	}
+	return true
+}
+
+func errorResponse(ctx *gin.Context, statusCode int, message string) {
+	ctx.JSON(statusCode, gin.H{
+		"error": message,
+	})
+}
+
+func orderNotFoundResponse(ctx *gin.Context, orderId string) {
+	errorResponse(ctx, 404, fmt.Sprintf("Order ID [%s] does not exist", orderId))
 }

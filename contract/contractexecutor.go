@@ -201,8 +201,7 @@ func BuyNFT(addressHex string, tokenId int64, privKeyHex string, nodeUrl string)
 		return err
 	}
 
-	// TODO: get the token ID from somewhere
-	tx, err := contractInstance.Buy(auth, big.NewInt(tokenId))
+	tx, err := contractInstance.Buy(auth)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
@@ -244,7 +243,6 @@ func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
 		return nil, err
 	}
 
-	// TODO: get the token ID from somewhere
 	ownerAddress, err := contractInstance.GetOwner(nil)
 
 	if err != nil {
@@ -254,7 +252,44 @@ func GetOwner(contractAddress string, privKeyHex string) (*string, error) {
 	return &owner, nil
 }
 
-func Burn() {
-	// TODO: verify that only the owner can burn this token
-	
+func BurnContract(contractAddress string, privKeyHex string) error {
+	client, err := ethclient.Dial("http://172.13.3.1:8545")
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error dialing the node: %v", err))
+	}
+
+	privKey, err := crypto.HexToECDSA(privKeyHex)
+	if err != nil {
+		return err
+	}
+
+	publicKey := privKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
+	}
+
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		return err
+	}
+
+	txOpts := bind.NewKeyedTransactor(privKey)
+	txOpts.Nonce = big.NewInt(int64(nonce))
+
+	address := common.HexToAddress(contractAddress)
+	contractInstance, err := NewDeliveryToken(address, client)
+	if err != nil {
+		return err
+	}
+
+	_, err = contractInstance.BurnToken(txOpts)
+
+	if err != nil {
+		log.Errorf("Failed to burn token: %v", err)
+		return err
+	}
+
+	return nil
 }

@@ -33,13 +33,18 @@ func main() {
 		orderController.CreateOrder(ctx)
 	})
 
-	// TODO: to make this RESTful, should take the action in the post body not the URL path
+	// TODO: make this RESTful by taking the 'delivered' state in the post body, not the URL path
 	router.POST("/order/:orderId/deliver", func(ctx *gin.Context) {
 		orderController.DeliverOrder(ctx)
 	})
 
 	router.GET("/order/:orderId/owner", func(ctx *gin.Context) {
 		orderController.GetDeliveryTokenOwner(ctx)
+	})
+
+	// TODO: make this RESTful by taking the 'canceled' state in the POST body.
+	router.POST("/order/:orderId/cancel", func(ctx *gin.Context) {
+		orderController.CancelOrder(ctx)
 	})
 
 	router.Run(":3000")

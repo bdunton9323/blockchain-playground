@@ -31,11 +31,11 @@ contract DeliveryToken is ERC721, ERC721Burnable {
 
     // the monetaryValue is the price that it costs to buy this token
     function safeMint(address to, uint256 monetaryValue, address _allowedPurchaser) internal {
+        _tokenIdCounter.increment();
         tokenId = _tokenIdCounter.current();
         minted = true;
         purchasePrice = monetaryValue;
         allowedPurchaser = _allowedPurchaser;
-        _tokenIdCounter.increment();
         _safeMint(to, tokenId);
         emit NFTMinted(tokenId);
     }
@@ -53,16 +53,17 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         return owner;
     }
 
-    // buy this token from the owner (receive the physical goods the token represents)
-    function buy(uint256 _tokenId) external payable {
+    // Buy this token from the owner (receive the physical goods the token represents)
+    // This token can only be bought and transferred once. Buyer beware!
+    function buy() external payable {
         require(msg.sender == allowedPurchaser, "Not an approved user");
         require(purchasePrice == msg.value, "Wrong purchase price");
 
-        address seller = ownerOf(_tokenId);
+        address seller = ownerOf(tokenId);
         require(msg.sender != seller, "You cannot buy the token from yourself");
 
         // give the token to the buyer
-        _transfer(seller, msg.sender, _tokenId);
+        _transfer(seller, msg.sender, tokenId);
         // send ETH to the seller
         payable(seller).transfer(msg.value);
         // set the new owner
@@ -73,8 +74,8 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         emit NftBought(seller, msg.sender, msg.value);
     }
 
-    function _burn(uint256 _tokenId) internal override(ERC721) {
+    function burnToken() public {
         require(msg.sender == owner, "Only the owner can void the contract");
-        super._burn(_tokenId);
+        super._burn(tokenId);
     }
 }
