@@ -11,17 +11,44 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// The controller itself
 type OrderController struct {
 	NodeUrl          string
 	ServerPrivateKey string
 	OrderRepository  *orders.MariaDBOrderRepository
 }
 
+// The request body for updating the status of an order
 type OrderUpdateRequest struct {
 	Status string
 }
 
-// Creates an order that can later be delivered
+// Metadata about the order that was placed
+type CreateOrderResponse struct {
+	Address         string `json:"address"`
+	TokenId         string `json:"message`
+	ContractAddress string `json:"contractAddress`
+	OrderId         string `json:"orderId"`
+}
+
+// Error response from the API
+type ApiError struct {
+	Error string `json:"error"`
+}
+
+// PingExample godoc
+// @Summary      ping example
+// @Description  Places an order that can later be delivered
+// @Tags         order
+// @Accept       json
+// @Produce      json
+// @Param        itemId        query  string  true  "The item to order"
+// @Param        buyerAddress  query  string  true  "the Ethereum address of the user who can accept the delivery"
+// @Success      200  {object}  CreateOrderResponse
+// @Failure      400  {object}  ApiError
+// @Failure      404  {object}  ApiError
+// @Failure      500  {object}  ApiError
+// @Router       /order [post]
 func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
 	if !validateArgs(ctx, "itemId", "buyerAddress") {
