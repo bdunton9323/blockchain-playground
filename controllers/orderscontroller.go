@@ -13,9 +13,14 @@ import (
 
 // The controller itself
 type OrderController struct {
+	// the URL of the ethereum node to connect to
 	NodeUrl          string
+	// the private key of the server's ethereum address
 	ServerPrivateKey string
+	// the persistence layer for the orders
 	OrderRepository  *orders.MariaDBOrderRepository
+	// executes operations on the smart delivery contract
+	ContractExecutor *contract.DeliveryContractExecutor
 }
 
 // The request body for updating the status of an order. One of "delivered" or "canceled".
@@ -72,7 +77,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
 	// make up a price since there is no database of inventory
 	price := int64(0)
-	tokenId, address, err := contract.DeployContractAndMintNFT(
+	tokenId, address, err := _Controller.ContractExecutor.DeployContractAndMintNFT(
 		_Controller.ServerPrivateKey,
 		_Controller.NodeUrl,
 		price,
@@ -90,7 +95,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		ItemId:       itemId,
 		ItemName:     "socks",
 		Price:        price,
-		TokenAddress: *address,
+		TokenAddress: address,
 		TokenId:      tokenId.Int64(),
 		Delivered:    false,
 	}
@@ -102,9 +107,9 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		})
 	} else {
 		ctx.JSON(200, CreateOrderResponse{
-			Address:         *address,
+			Address:         address,
 			TokenId:         tokenId.String(),
-			ContractAddress: *address,
+			ContractAddress: address,
 			OrderId:         order.OrderId,
 		})
 	}

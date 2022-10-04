@@ -15,51 +15,57 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type DeliveryContractExecutor struct {
+	Client           *ethclient.Client
+	ServerPrivateKey *ecdsa.PrivateKey
+}
+
+func NewDeliveryContractExecutor(nodeUrl string, serverPrivateKey string) (*DeliveryContractExecutor, error) {
+	client, err := ethclient.Dial("http://172.13.3.1:8545")
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Could not connect to ethereum node: %v", err))
+	}
+
+	privKey, err := crypto.HexToECDSA(serverPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DeliveryContractExecutor{
+		Client: client,
+		ServerPrivateKey: privKey,
+	}, nil
+}
+
+
 // return (tokenId, token address, error)
-func DeployContractAndMintNFT(
+func (_exec *DeliveryContractExecutor) DeployContractAndMintNFT(
 	privKeyHex string,
 	nodeUrl string,
 	purchasePrice int64,
-	userAddress string) (*big.Int, *string, error) {
+	userAddress string) (*big.Int, string, error) {
 
-	client, err := ethclient.Dial("http://172.13.3.1:8545")
+	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Error dialing the node: %v", err))
+		return nil, "", err
 	}
 
-	privKey, err := crypto.HexToECDSA(privKeyHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	publicKey := privKey.Public()
-	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, nil, errors.New(fmt.Sprintf("error casting public key to ECDSA: %v", err))
-	}
-
-	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	txOpts := bind.NewKeyedTransactor(privKey)
-	txOpts.Nonce = big.NewInt(int64(nonce))
+	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
+	txOpts.Nonce = nonce
 
 	// Deploy the contract
-	address, tx, tokenContract, err := DeployDeliveryToken(txOpts, client)
+	address, tx, tokenContract, err := DeployDeliveryToken(txOpts, _exec.Client)
 	if err != nil {
-		return nil, nil, errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
+		return nil, "", errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
 	}
 	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
 
-	nonce++
-	txOpts.Nonce = big.NewInt(int64(nonce))
+	// Need a new nonce for the next transaction
+	txOpts.Nonce = nonce.Add(nonce, big.NewInt(1))
 	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
 
 	contractAddress := address.Hex()
-	return tokenId, &contractAddress, nil
+	return tokenId, contractAddress, nil
 }
 
 func mintToken(
@@ -292,4 +298,21 @@ func BurnContract(contractAddress string, privKeyHex string) error {
 	}
 
 	return nil
+}
+
+
+// Gets a nonce to use for the next transaction
+func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*big.Int, error) {
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("Error casting public key to ECDSA"))
+	}
+	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
+	nonce, err := _exec.Client.PendingNonceAt(context.Background(), fromAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return big.NewInt(int64(nonce)), nil
 }

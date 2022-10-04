@@ -4,6 +4,7 @@ import (
 	"flag"
 	"strings"
 
+	"github.com/bdunton9323/blockchain-playground/contract"
 	"github.com/bdunton9323/blockchain-playground/controllers"
 	"github.com/bdunton9323/blockchain-playground/orders"
 	log "github.com/sirupsen/logrus"
@@ -30,13 +31,19 @@ func main() {
 
 	orderRepo, err := orders.NewMariaDBOrderRepository(dbHost, dbName, dbUser, dbPassword)
 	if err != nil {
-		log.Fatal("Could not connect to database")
+		log.Fatal("Could not connect to database: %s", err.Error())
+	}
+
+	contractExecutor, err := contract.NewDeliveryContractExecutor(ethNodeUrl, *privateKey)
+	if err != nil {
+		log.Fatal("Could not build the contract executor: %s", err.Error())
 	}
 
 	var orderController = &controllers.OrderController{
 		ServerPrivateKey: *privateKey,
 		NodeUrl:          ethNodeUrl,
 		OrderRepository:  orderRepo,
+		ContractExecutor: contractExecutor,
 	}
 	controllers.NewApiRouter(orderController).Start()
 }
