@@ -68,6 +68,8 @@ docker build -t blockchain-playground .
 docker run --rm -p 8080:8080 blockchain-playground
 ```
 
+Once it's running, you can view the API documentation and try out the APIs here: http://localhost:8080/swagger/index.html!
+
 ## Developing
 The API docs are generated with `swaggo`: https://github.com/swaggo/swag
 
