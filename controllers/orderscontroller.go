@@ -26,8 +26,8 @@ type OrderUpdateRequest struct {
 // Metadata about the order that was placed
 type CreateOrderResponse struct {
 	Address         string `json:"address"`
-	TokenId         string `json:"message`
-	ContractAddress string `json:"contractAddress`
+	TokenId         string `json:"message"`
+	ContractAddress string `json:"contractAddress"`
 	OrderId         string `json:"orderId"`
 }
 
@@ -94,11 +94,12 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		errorResponse(ctx, 500, "Error writing order to database")
 		return
 	}
-	ctx.JSON(200, gin.H{
-		"address":         address,
-		"tokenId":         tokenId,
-		"contractAddress": address,
-		"orderId":         order.OrderId,
+
+	ctx.JSON(200, CreateOrderResponse{
+		Address:         *address,
+		TokenId:         tokenId.String(),
+		ContractAddress: *address,
+		OrderId:         order.OrderId,
 	})
 }
 
