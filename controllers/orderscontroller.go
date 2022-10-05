@@ -76,7 +76,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	userAddress := ctx.Query("buyerAddress")
 
 	// make up a price since there is no database of inventory
-	price := int64(0)
+	price := int64(500)
 	tokenId, address, err := _Controller.ContractExecutor.DeployContractAndMintNFT(
 		_Controller.ServerPrivateKey,
 		_Controller.NodeUrl,
@@ -210,7 +210,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = _Controller.ContractExecutor.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, _Controller.NodeUrl)
+	err = _Controller.ContractExecutor.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, order.Price)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),

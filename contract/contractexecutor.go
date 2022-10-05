@@ -113,8 +113,6 @@ func waitForContractAndMintToken(
 	}
 	log.Infof("Tx sent with ID [%s] to mint a token", tx.Hash().Hex())
 
-	waitForMint(tokenContract)
-
 	return err
 }
 
@@ -139,11 +137,7 @@ func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 }
 
 // Purches the token from the owner
-func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, buyerPrivateKey string, nodeUrl string) error {
-	client, err := ethclient.Dial("http://172.13.3.1:8545")
-	if err != nil {
-		return errors.New(fmt.Sprintf("Error dialing the node: %v", err))
-	}
+func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, buyerPrivateKey string, price int64) error {
 
 	privKey, err := crypto.HexToECDSA(buyerPrivateKey)
 	if err != nil {
@@ -158,8 +152,8 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	txOpts := bind.NewKeyedTransactor(privKey)
 	txOpts.Nonce = nonce
 
-	// the amount of Ether being sent in the request
-	txOpts.Value = big.NewInt(0) // in wei
+	// the amount of Ether being sent in the request, in wei
+	txOpts.Value = big.NewInt(price)
 
 	// Quorum is gasless, so this doesn't work there
 	// gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -170,7 +164,7 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	// txOpts.GasPrice = gasPrice
 
 	address := common.HexToAddress(addressHex)
-	contractInstance, err := NewDeliveryToken(address, client)
+	contractInstance, err := NewDeliveryToken(address, _exec.Client)
 	if err != nil {
 		return err
 	}
