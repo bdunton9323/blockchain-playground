@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/bdunton9323/blockchain-playground/contract"
@@ -71,17 +72,23 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	}
 
 	itemId := ctx.Query("itemId")
+	orderId := uuid.New().String()
 
 	// the customer who is allowed to receive the shipment
 	userAddress := ctx.Query("buyerAddress")
 
 	// make up a price since there is no database of inventory
-	price := int64(500)
-	tokenId, address, err := _Controller.ContractExecutor.DeployContractAndMintNFT(
-		_Controller.ServerPrivateKey,
-		_Controller.NodeUrl,
-		price,
-		userAddress)
+	orderPrice := int64(500)
+	deliveryPrice := int64(75)
+
+	purchase := &contract.Purchase{
+		OrderId:          orderId,
+		PurchasePrice:    big.NewInt(orderPrice),
+		DeliveryPrice:    big.NewInt(deliveryPrice),
+		RecipientAddress: userAddress,
+	}
+
+	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -90,11 +97,12 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		return
 	}
 
+	// TODO: add the delivery price to the database
 	order := &orders.Order{
-		OrderId:      uuid.New().String(),
+		OrderId:      orderId,
 		ItemId:       itemId,
 		ItemName:     "socks",
-		Price:        price,
+		Price:        orderPrice,
 		TokenAddress: address,
 		TokenId:      tokenId.Int64(),
 		Delivered:    false,
@@ -169,7 +177,7 @@ func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
 		return
 	}
 
-	owner, err := _Controller.ContractExecutor.GetOwner(order.TokenAddress, _Controller.ServerPrivateKey)
+	owner, err := _Controller.ContractExecutor.GetOwner(order.TokenId)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -235,7 +243,7 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	err := _Controller.ContractExecutor.BurnContract(order.TokenAddress, _Controller.ServerPrivateKey)
+	err := _Controller.ContractExecutor.BurnContract(order.OrderId)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: "Failed to cancel the order",

@@ -22,6 +22,7 @@ var dbPassword = "mysqlPassword"
 
 func main() {
 	privateKey := flag.String("privatekey", "", "The private key of the microservice (i.e. the vendor)")
+	contractAddress := flag.String("contractAddress", "", "The address of an existing delivery contract. If omitted, will deploy a new one")
 	flag.Parse()
 
 	// the signature code expects the bare hex string
@@ -34,7 +35,7 @@ func main() {
 		log.Fatal("Could not connect to database: %s", err.Error())
 	}
 
-	contractExecutor, err := contract.NewDeliveryContractExecutor(ethNodeUrl, *privateKey)
+	contractExecutor, err := contract.NewDeliveryContractExecutor(ethNodeUrl, *privateKey, contractAddress)
 	if err != nil {
 		log.Fatal("Could not build the contract executor: %s", err.Error())
 	}

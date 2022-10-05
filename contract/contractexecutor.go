@@ -15,12 +15,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// instance variables needed by the contract executor
 type DeliveryContractExecutor struct {
 	Client           *ethclient.Client
 	ServerPrivateKey *ecdsa.PrivateKey
+	ContractAddress  *common.Address
+	ContractInstance *DeliveryToken
 }
 
-func NewDeliveryContractExecutor(nodeUrl string, serverPrivateKey string) (*DeliveryContractExecutor, error) {
+// Creates a new DeliveryContractExecutor that can interact with a delivery contract.
+// This will either create a new instance of the contract or use an existing address.
+//
+// contractAddress - optional. If not given, this will deploy a new instance of the contract.
+func NewDeliveryContractExecutor(
+	nodeUrl string,
+	serverPrivateKey string,
+	contractAddress *string,
+) (*DeliveryContractExecutor, error) {
+
 	client, err := ethclient.Dial("http://172.13.3.1:8545")
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Could not connect to ethereum node: %v", err))
@@ -31,18 +43,58 @@ func NewDeliveryContractExecutor(nodeUrl string, serverPrivateKey string) (*Deli
 		return nil, err
 	}
 
-	return &DeliveryContractExecutor{
+	executor := DeliveryContractExecutor{
 		Client:           client,
 		ServerPrivateKey: privKey,
-	}, nil
+	}
+
+	// Either look up the existing contract or deploy a new one
+	if contractAddress != nil && len(*contractAddress) != 0 {
+		addr := common.HexToAddress(*contractAddress)
+		contractInstance, err := NewDeliveryToken(addr, client)
+		if err != nil {
+			return nil, err
+		}
+		executor.ContractAddress = &addr
+		executor.ContractInstance = contractInstance
+	} else {
+		log.Info("Deploying a new delivery contract")
+		newAddr, contract, err := executor.deployContract()
+		if err != nil {
+			return nil, err
+		}
+		executor.ContractAddress = newAddr
+		executor.ContractInstance = contract
+	}
+
+	return &executor, nil
+}
+
+func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *DeliveryToken, error) {
+	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
+	txOpts.Nonce = nonce
+
+	contractAddress, tx, tokenContract, err := DeployDeliveryToken(txOpts, _exec.Client)
+	if err != nil {
+		return nil, nil, errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
+	}
+	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
+
+	err = _exec.waitForMining(tx.Hash(), 30)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &contractAddress, tokenContract, nil
 }
 
 // returns (tokenId, token address, error)
-func (_exec *DeliveryContractExecutor) DeployContractAndMintNFT(
-	privKeyHex string,
-	nodeUrl string,
-	purchasePrice int64,
-	userAddress string) (*big.Int, string, error) {
+func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, string, error) {
 
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
@@ -52,41 +104,44 @@ func (_exec *DeliveryContractExecutor) DeployContractAndMintNFT(
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
 
-	// Deploy the contract
-	address, tx, tokenContract, err := DeployDeliveryToken(txOpts, _exec.Client)
-	if err != nil {
-		return nil, "", errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
-	}
-	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
+	tokenId, err := _exec.mintToken(
+		txOpts,
+		purchase,
+		common.HexToAddress(purchase.RecipientAddress))
 
-	err = _exec.waitForMining(tx.Hash(), 30)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Need a new nonce for the next transaction
-	txOpts.Nonce = nonce.Add(nonce, big.NewInt(1))
-	tokenId, err := _exec.mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
-
-	contractAddress := address.Hex()
-	return tokenId, contractAddress, nil
+	return tokenId, _exec.ContractAddress.Hex(), nil
 }
 
 // call the "mint" operation in the token contract and return the tokenId
 func (_exec *DeliveryContractExecutor) mintToken(
-	tokenContract *DeliveryToken,
 	txOpts *bind.TransactOpts,
-	purchasePrice int64,
-	userAddress common.Address) (*big.Int, error) {
+	purchase *Purchase,
+	userAddress common.Address,
+) (*big.Int, error) {
 
-	log.Infof("Minting token that can later be purchased by [%v] for cost [%v]", userAddress.Hex(), purchasePrice)
-	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice), userAddress)
+	log.Infof("User [%s] is paying [%d] to mint a token token with a delivery cost of [%v]",
+		userAddress.Hex(),
+		purchase.PurchasePrice,
+		purchase.DeliveryPrice)
+
+	recipientAddress := common.HexToAddress(purchase.RecipientAddress)
+	_exec.printBalances(&recipientAddress, _exec.ContractAddress)
+
+	tx, err := _exec.ContractInstance.MintToken(
+		txOpts,
+		recipientAddress,
+		purchase.PurchasePrice,
+		purchase.DeliveryPrice,
+		purchase.OrderId)
+
 	err = _exec.waitForMining(tx.Hash(), 30)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenId, err := tokenContract.GetId(nil)
+	_exec.printBalances(&recipientAddress, _exec.ContractAddress)
+
+	tokenId, err := _exec.ContractInstance.GetTokenIdForOrder(nil, purchase.OrderId)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +187,7 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	// print a balance before and after so we can see that ether was actually transferred
 	_exec.printBalances(buyerAddress, &contractAddress)
 
-	tx, err := contractInstance.Buy(txOpts)
+	tx, err := contractInstance.Buy(txOpts, big.NewInt(tokenId))
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
@@ -147,7 +202,7 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 }
 
 // Returns the owner of the token
-func (_exec *DeliveryContractExecutor) GetOwner(contractAddress string, privKeyHex string) (string, error) {
+func (_exec *DeliveryContractExecutor) GetOwner(tokenId int64) (string, error) {
 
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
@@ -157,13 +212,7 @@ func (_exec *DeliveryContractExecutor) GetOwner(contractAddress string, privKeyH
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
 
-	address := common.HexToAddress(contractAddress)
-	contractInstance, err := NewDeliveryToken(address, _exec.Client)
-	if err != nil {
-		return "", err
-	}
-
-	ownerAddress, err := contractInstance.GetOwner(nil)
+	ownerAddress, err := _exec.ContractInstance.OwnerOf(nil, big.NewInt(tokenId))
 
 	if err != nil {
 		return "", err
@@ -173,7 +222,7 @@ func (_exec *DeliveryContractExecutor) GetOwner(contractAddress string, privKeyH
 }
 
 // Destroys the token
-func (_exec *DeliveryContractExecutor) BurnContract(contractAddress string, privKeyHex string) error {
+func (_exec *DeliveryContractExecutor) BurnContract(orderId string) error {
 
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
@@ -183,13 +232,7 @@ func (_exec *DeliveryContractExecutor) BurnContract(contractAddress string, priv
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
 
-	address := common.HexToAddress(contractAddress)
-	contractInstance, err := NewDeliveryToken(address, _exec.Client)
-	if err != nil {
-		return err
-	}
-
-	_, err = contractInstance.BurnToken(txOpts)
+	_, err = _exec.ContractInstance.BurnTokenByOrderId(txOpts, orderId)
 
 	if err != nil {
 		log.Errorf("Failed to burn token: %v", err)
