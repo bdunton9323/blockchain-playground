@@ -94,8 +94,7 @@ func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *Deliv
 }
 
 // returns (tokenId, token address, error)
-func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, string, error) {
-
+func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase, buyerPrivateKey string) (*big.Int, string, error) {
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
 		return nil, "", err
@@ -103,29 +102,23 @@ func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, st
 
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
-
-	tokenId, err := _exec.mintToken(
-		txOpts,
-		purchase,
-		common.HexToAddress(purchase.RecipientAddress))
-
-	return tokenId, _exec.ContractAddress.Hex(), nil
-}
-
-// call the "mint" operation in the token contract and return the tokenId
-func (_exec *DeliveryContractExecutor) mintToken(
-	txOpts *bind.TransactOpts,
-	purchase *Purchase,
-	userAddress common.Address,
-) (*big.Int, error) {
+	// userAddress := common.HexToAddress(purchase.RecipientAddress)
+	//
+	recipientAddress := common.HexToAddress(purchase.RecipientAddress)
+	// _exec.printBalances(&recipientAddress, _exec.ContractAddress)
+	//
+	// txOpts, _, err := _exec.buildTxOptsForCustomerKey(buyerPrivateKey)
+	// if err != nil {
+	// 	return nil, "", err
+	// }
+	//
+	// pay the cost of the order, in wei
+	//txOpts.Value = big.NewInt(purchase.DeliveryPrice.Int64())
 
 	log.Infof("User [%s] is paying [%d] to mint a token token with a delivery cost of [%v]",
-		userAddress.Hex(),
+		recipientAddress.Hex(),
 		purchase.PurchasePrice,
 		purchase.DeliveryPrice)
-
-	recipientAddress := common.HexToAddress(purchase.RecipientAddress)
-	_exec.printBalances(&recipientAddress, _exec.ContractAddress)
 
 	tx, err := _exec.ContractInstance.MintToken(
 		txOpts,
@@ -134,39 +127,37 @@ func (_exec *DeliveryContractExecutor) mintToken(
 		purchase.DeliveryPrice,
 		purchase.OrderId)
 
+	if err != nil {
+		return nil, "", err
+	}
+
 	err = _exec.waitForMining(tx.Hash(), 30)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	_exec.printBalances(&recipientAddress, _exec.ContractAddress)
 
 	tokenId, err := _exec.ContractInstance.GetTokenIdForOrder(nil, purchase.OrderId)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return tokenId, nil
+	return tokenId, _exec.ContractAddress.Hex(), nil
 }
 
 // Purches the token from the owner
-func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, buyerPrivateKey string, price int64) error {
+func (_exec *DeliveryContractExecutor) BuyNFT(
+	tokenId int64,
+	buyerPrivateKey string,
+	price int64,
+	deliveryPrice int64,
+) error {
 
-	privKey, err := crypto.HexToECDSA(buyerPrivateKey)
-	if err != nil {
-		return err
-	}
-
-	nonce, err := _exec.getNonce(privKey)
-	if err != nil {
-		return err
-	}
-
-	txOpts := bind.NewKeyedTransactor(privKey)
-	txOpts.Nonce = nonce
+	txOpts, buyerAddress, err := _exec.buildTxOptsForCustomerKey(buyerPrivateKey)
 
 	// the amount of Ether being sent in the request, in wei
-	txOpts.Value = big.NewInt(price)
+	txOpts.Value = big.NewInt(price + deliveryPrice)
 
 	// I'm using Quorum, which is configured to be gasless, so this doesn't work
 	// gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -176,18 +167,10 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	// txOpts.GasLimit = uint64(300000) // in gas units
 	// txOpts.GasPrice = gasPrice
 
-	contractAddress := common.HexToAddress(addressHex)
-	contractInstance, err := NewDeliveryToken(contractAddress, _exec.Client)
-	if err != nil {
-		return err
-	}
-
-	buyerAddress := _exec.getAddressFromKey(privKey)
-
 	// print a balance before and after so we can see that ether was actually transferred
-	_exec.printBalances(buyerAddress, &contractAddress)
+	_exec.printBalances(buyerAddress, _exec.ContractAddress)
 
-	tx, err := contractInstance.Buy(txOpts, big.NewInt(tokenId))
+	tx, err := _exec.ContractInstance.Buy(txOpts, big.NewInt(tokenId))
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
@@ -197,8 +180,28 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 		return err
 	}
 
-	_exec.printBalances(buyerAddress, &contractAddress)
+	_exec.printBalances(buyerAddress, _exec.ContractAddress)
 	return nil
+}
+
+func (_exec *DeliveryContractExecutor) buildTxOptsForCustomerKey(
+	customerPrivateKey string,
+) (*bind.TransactOpts, *common.Address, error) {
+
+	privKey, err := crypto.HexToECDSA(customerPrivateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nonce, err := _exec.getNonce(privKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	txOpts := bind.NewKeyedTransactor(privKey)
+	txOpts.Nonce = nonce
+
+	return txOpts, _exec.getAddressFromKey(privKey), nil
 }
 
 // Returns the owner of the token
@@ -258,6 +261,7 @@ func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*
 	return big.NewInt(int64(nonce)), nil
 }
 
+// TODO: since the money isn't stored in the contract, change this to print the vendor's balance
 func (_exec *DeliveryContractExecutor) printBalances(customerAddress *common.Address, contractAddress *common.Address) {
 	customerBalance, err1 := _exec.Client.BalanceAt(context.Background(), *customerAddress, nil)
 	contractBalance, err2 := _exec.Client.BalanceAt(context.Background(), *contractAddress, nil)

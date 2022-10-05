@@ -23,27 +23,31 @@ contract DeliveryToken is ERC721, ERC721Burnable {
 
     // Minting this token represents the customer purchasing something from the vendor for delivery.
     // The customer can accept delivery by purchasing the token from the one who minted it.
-    // Minting this token will transer the cost of the goods from the customer to the vendor.
-    // The shipping cost is settled when the customer purchases the token.
+    // The cost of the order plus shipping is paid when the customer purchases the token.
     //
     // allowedPurchaser: the user who is allowed to purchase the token from the owner
-    // deliveryCost: the price it costs the allowedPurchaser to buy this token
+    // deliveryPrice: the price it costs the allowedPurchaser to buy this token
+    // orderPrice: the price of the goods being purchased
     function mintToken(address allowedPurchaser, uint256 deliveryPrice, uint256 orderPrice, string memory orderId) public payable {
-        require(msg.sender == vendor, "Only the approved person can mint this token");
-        require(msg.value == orderPrice, "Must pay for order up front");
-
+        // I could have had the customer pay now for the goods and pay the shipping 
+        // later, but that was more complex 
+        //
+        //require(msg.value == orderPrice, "Must pay for order up front");
         // Pay for the order
-        payable(vendor).transfer(msg.value);
+        //payable(vendor).transfer(msg.value);
 
         // get a token ID and store it so we can look it up later
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
-        deliveryPriceByTokenId[tokenId] = deliveryPrice;
+
+        deliveryPriceByTokenId[tokenId] = orderPrice + deliveryPrice;
         tokenIdByOrderId[orderId] = tokenId;
+
+        // the vendor starts out owning the token because they own the goods until paid
+        _safeMint(vendor, tokenId);
 
         // approve the customer to buy the token from the vendor
         approve(allowedPurchaser, tokenId);
-        _safeMint(allowedPurchaser, tokenId);
 
         emit NFTMinted(tokenId);
     }
@@ -60,7 +64,10 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         
         super._beforeTokenTransfer(from, to, tokenId);
 
-        require(_isApprovedOrOwner(to, tokenId));
+        // if the token is just being minted, it won't belong to anyone so don't check
+        if (from != address(0)) {
+            require(_isApprovedOrOwner(to, tokenId));
+        }
     }
 
 

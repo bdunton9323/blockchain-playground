@@ -60,6 +60,7 @@ type ApiError struct {
 // @Produce      json
 // @Param        itemId        query  string  true  "The item to order"
 // @Param        buyerAddress  query  string  true  "the Ethereum address of the user who can accept the delivery"
+// @Param        customerKey   query  string  true  "The private key of the customer, for transferring money"
 // @Success      200  {object}  CreateOrderResponse
 // @Failure      400  {object}  ApiError
 // @Failure      404  {object}  ApiError
@@ -67,9 +68,14 @@ type ApiError struct {
 // @Router       /order [post]
 func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
-	if !validateArgs(ctx, "itemId", "buyerAddress") {
+	if !validateArgs(ctx, "itemId", "buyerAddress", "customerKey") {
 		return
 	}
+
+	// The customer has to transfer money to purchase the goods, so we need their key.
+	// This would be a terrible idea in real life, but this is just a demo of the
+	// contract's functionality.
+	customerPrivateKey := ctx.Query("customerKey")
 
 	itemId := ctx.Query("itemId")
 	orderId := uuid.New().String()
@@ -88,7 +94,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		RecipientAddress: userAddress,
 	}
 
-	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase)
+	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase, customerPrivateKey)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -218,7 +224,9 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = _Controller.ContractExecutor.BuyNFT(order.TokenAddress, order.TokenId, customerPrivateKey, order.Price)
+	// TODO: get the delivery price from the database
+	deliveryPrice := 75
+	err = _Controller.ContractExecutor.BuyNFT(order.TokenId, customerPrivateKey, order.Price, int64(deliveryPrice))
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),
