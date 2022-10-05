@@ -97,15 +97,15 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		return
 	}
 
-	// TODO: add the delivery price to the database
 	order := &orders.Order{
-		OrderId:      orderId,
-		ItemId:       itemId,
-		ItemName:     "socks",
-		Price:        orderPrice,
-		TokenAddress: address,
-		TokenId:      tokenId.Int64(),
-		Delivered:    false,
+		OrderId:       orderId,
+		ItemId:        itemId,
+		ItemName:      "socks",
+		Price:         orderPrice,
+		DeliveryPrice: deliveryPrice,
+		TokenAddress:  address,
+		TokenId:       tokenId.Int64(),
+		Delivered:     false,
 	}
 
 	err = _Controller.OrderRepository.CreateOrder(order)
@@ -154,7 +154,6 @@ func (_Controller *OrderController) UpdateOrderStatus(ctx *gin.Context) {
 
 // Determines who currently owns the deliver token - the vendor or the customer.
 // Returns the owner's address.
-
 // GetTokenOwner godoc
 // @Summary      Get the current owner of the delivery contract token
 // @Description  Determines who currently owns the deliver token - the vendor or the customer.

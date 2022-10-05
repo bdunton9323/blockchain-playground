@@ -10,14 +10,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// A DTO object representing a row in the database
 type Order struct {
-	OrderId      string
-	ItemId       string
-	ItemName     string
-	Price        int64
-	TokenAddress string
-	TokenId      int64
-	Delivered    bool
+	OrderId       string
+	ItemId        string
+	ItemName      string
+	Price         int64
+	DeliveryPrice int64
+	TokenAddress  string
+	TokenId       int64
+	Delivered     bool
 }
 
 type OrderRepository interface {
@@ -37,8 +39,9 @@ type MariaDBOrderRepository struct {
 }
 
 var ordersTable = "orders"
-var allFields = "order_id, item_id, item_name, price, token_address, token_id, delivered"
+var allFields = "order_id, item_id, item_name, price, delivery_price, token_address, token_id, delivered"
 
+// Construct a new repository connected to MariaDB
 func NewMariaDBOrderRepository(host string, dbName string, username string, password string) (*MariaDBOrderRepository, error) {
 	r := new(MariaDBOrderRepository)
 	r.host = host
@@ -56,8 +59,9 @@ func NewMariaDBOrderRepository(host string, dbName string, username string, pass
 	return r, nil
 }
 
+// Returns the order with the given ID from the database. If not found, then nil.
 func (repo *MariaDBOrderRepository) GetOrder(orderId string) (*Order, error) {
-	// I know this is vulnerable to SQL injection, but it's fine for the demo
+	// I know this is vulnerable to SQL injection, but it's fine for a demo
 	query := fmt.Sprintf("select %s from %s where order_id = '%s'",
 		allFields, ordersTable, orderId)
 
@@ -76,6 +80,7 @@ func (repo *MariaDBOrderRepository) GetOrder(orderId string) (*Order, error) {
 		&order.ItemId,
 		&order.ItemName,
 		&order.Price,
+		&order.DeliveryPrice,
 		&order.TokenAddress,
 		&order.TokenId,
 		&order.Delivered)
@@ -86,12 +91,14 @@ func (repo *MariaDBOrderRepository) GetOrder(orderId string) (*Order, error) {
 	return &order, nil
 }
 
+// Writes the given order to the database.
 func (repo *MariaDBOrderRepository) CreateOrder(order *Order) error {
 	values := []string{
 		fmt.Sprint(order.OrderId),
 		order.ItemId,
 		order.ItemName,
 		fmt.Sprint(order.Price),
+		fmt.Sprint(order.DeliveryPrice),
 		order.TokenAddress,
 		fmt.Sprint(order.TokenId),
 		func() string {
@@ -116,6 +123,7 @@ func (repo *MariaDBOrderRepository) CreateOrder(order *Order) error {
 	return nil
 }
 
+// Sets the 'delivered' field for the given order ID. Returns an error if the order doesn't exist.
 func (repo *MariaDBOrderRepository) MarkOrderDelivered(orderId string) error {
 	query := fmt.Sprintf("update orders set delivered = '1' where order_id = '%s'", orderId)
 	_, err := repo.runQuery(query)
@@ -125,6 +133,7 @@ func (repo *MariaDBOrderRepository) MarkOrderDelivered(orderId string) error {
 	return nil
 }
 
+// Runs the given query against the database
 func (repo *MariaDBOrderRepository) runQuery(query string) (*sql.Rows, error) {
 	log.Infof("running query [%s]", query)
 	return repo.conn.Query(query)
