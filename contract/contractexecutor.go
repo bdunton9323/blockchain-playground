@@ -59,83 +59,35 @@ func (_exec *DeliveryContractExecutor) DeployContractAndMintNFT(
 	}
 	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
 
-	err := _exec.waitForTransactionReceipt(tx.Hash(), 30)
-	if !ok {
+	err = _exec.waitForMining(tx.Hash(), 30)
+	if err != nil {
 		return nil, "", err
 	}
-	log.Infof("Tx [%s] was mined", tx.Hash().Hex())
 
 	// Need a new nonce for the next transaction
 	txOpts.Nonce = nonce.Add(nonce, big.NewInt(1))
-	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
+	tokenId, err := _exec.mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
 
 	contractAddress := address.Hex()
 	return tokenId, contractAddress, nil
 }
 
-func mintToken(
+// call the "mint" operation in the token contract and return the tokenId
+func (_exec *DeliveryContractExecutor) mintToken(
 	tokenContract *DeliveryToken,
 	txOpts *bind.TransactOpts,
 	purchasePrice int64,
 	userAddress common.Address) (*big.Int, error) {
 
-	log.Infof("Minting token to be purchased by [%v] for cost [%v]", userAddress.Hex(), purchasePrice)
-	err := waitForContractAndMintToken(tokenContract, txOpts, purchasePrice, userAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	tokenId, err := waitForTokenId(tokenContract)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokenId, nil
-}
-
-// The transaction to deploy the contract has to be mined by the
-// blockchain before we can use it. I'm sure there is a better way
-// to do this, but until I am more familiar with Go and the ABI
-// bindings, this will have to do.
-func waitForContractAndMintToken(
-	tokenContract *DeliveryToken,
-	txOpts *bind.TransactOpts,
-	purchasePrice int64,
-	userAddress common.Address) error {
-
+	log.Infof("Minting token that can later be purchased by [%v] for cost [%v]", userAddress.Hex(), purchasePrice)
 	tx, err := tokenContract.MintToken(txOpts, big.NewInt(purchasePrice), userAddress)
-
-	numTries := 1
-	for err != nil && numTries < 5 {
-		numTries++
-		tx, err = tokenContract.MintToken(txOpts, big.NewInt(purchasePrice), userAddress)
-		if err != nil {
-			time.Sleep(2 * time.Second)
-		}
-	}
-
+	err = _exec.waitForMining(tx.Hash(), 30)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error setting value in contract: %v", err))
+		return nil, err
 	}
-	log.Infof("Tx sent with ID [%s] to mint a token", tx.Hash().Hex())
 
-	return err
-}
-
-// The transaction to deploy the contract has to be mined by the
-// blockchain before we can use it. I'm sure there is a better way
-// to do this, but until I am more familiar with Go and the ABI
-// bindings, this will have to do.
-func waitForTokenId(tokenContract *DeliveryToken) (*big.Int, error) {
 	tokenId, err := tokenContract.GetId(nil)
-	numTries := 1
-	for err != nil && numTries < 5 {
-		time.Sleep(2 * time.Second)
-		numTries++
-		tokenId, err = tokenContract.GetId(nil)
-	}
 	if err != nil {
-		log.Errorf("Error getting token ID. The transaction may not have been mined. %v", err)
 		return nil, err
 	}
 
@@ -294,18 +246,14 @@ func (_exec *DeliveryContractExecutor) getAddressFromKey(privateKey *ecdsa.Priva
 	return &address
 }
 
-func (_exec *DeliveryContractExecutor) waitForTransactionReceipt(txHash common.Hash, maxWaitSeconds int) error {
+// When a transaction is sent to the blockchain, it is pending until it actually gets incorporated into a block.
+// By watching the transaction receipt, we can be sure the result of the transaction will be visible in the
+// next call.
+func (_exec *DeliveryContractExecutor) waitForMining(txHash common.Hash, maxWaitSeconds int) error {
 	isMined := false
 	startTime := time.Now()
 	for !isMined && int(time.Since(startTime).Seconds()) < maxWaitSeconds {
 		receipt, err := _exec.Client.TransactionReceipt(context.Background(), txHash)
-
-		if receipt != nil {
-			log.Infof("Blocknumber: %v", receipt.BlockNumber)
-			if receipt.BlockNumber != nil {
-				log.Infof("Blocknumber as uint64: %v", receipt.BlockNumber.Uint64())
-			}
-		}
 
 		isMined = err == nil && receipt != nil && receipt.BlockNumber != nil && receipt.BlockNumber.Uint64() > 0
 
@@ -315,8 +263,10 @@ func (_exec *DeliveryContractExecutor) waitForTransactionReceipt(txHash common.H
 	}
 
 	if !isMined {
-		return errors.New(fmt.Sprintf("Transaction [%s] was not mined after 30 seconds", tx.Hash().Hex()))
+		return errors.New(fmt.Sprintf("Transaction [%s] was not mined after 30 seconds", txHash.Hex()))
 	}
+
+	log.Infof("Tx [%s] was mined", txHash.Hex())
 	return nil
 }
 
