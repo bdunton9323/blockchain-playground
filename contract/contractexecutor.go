@@ -59,6 +59,12 @@ func (_exec *DeliveryContractExecutor) DeployContractAndMintNFT(
 	}
 	log.Infof("Tx sent with ID [%s] to create contract", tx.Hash().Hex())
 
+	err := _exec.waitForTransactionReceipt(tx.Hash(), 30)
+	if !ok {
+		return nil, "", err
+	}
+	log.Infof("Tx [%s] was mined", tx.Hash().Hex())
+
 	// Need a new nonce for the next transaction
 	txOpts.Nonce = nonce.Add(nonce, big.NewInt(1))
 	tokenId, err := mintToken(tokenContract, txOpts, purchasePrice, common.HexToAddress(userAddress))
@@ -286,6 +292,32 @@ func (_exec *DeliveryContractExecutor) getAddressFromKey(privateKey *ecdsa.Priva
 	}
 	address := crypto.PubkeyToAddress(*publicKeyECDSA)
 	return &address
+}
+
+func (_exec *DeliveryContractExecutor) waitForTransactionReceipt(txHash common.Hash, maxWaitSeconds int) error {
+	isMined := false
+	startTime := time.Now()
+	for !isMined && int(time.Since(startTime).Seconds()) < maxWaitSeconds {
+		receipt, err := _exec.Client.TransactionReceipt(context.Background(), txHash)
+
+		if receipt != nil {
+			log.Infof("Blocknumber: %v", receipt.BlockNumber)
+			if receipt.BlockNumber != nil {
+				log.Infof("Blocknumber as uint64: %v", receipt.BlockNumber.Uint64())
+			}
+		}
+
+		isMined = err == nil && receipt != nil && receipt.BlockNumber != nil && receipt.BlockNumber.Uint64() > 0
+
+		if !isMined {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !isMined {
+		return errors.New(fmt.Sprintf("Transaction [%s] was not mined after 30 seconds", tx.Hash().Hex()))
+	}
+	return nil
 }
 
 // There is some functionalilty in the ABI bindings for subscribing to an events channel to watch for events
