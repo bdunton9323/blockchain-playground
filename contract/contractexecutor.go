@@ -113,7 +113,7 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	// the amount of Ether being sent in the request, in wei
 	txOpts.Value = big.NewInt(price)
 
-	// Quorum is gasless, so this doesn't work there
+	// I'm using Quorum, which is configured to be gasless, so this doesn't work
 	// gasPrice, err := client.SuggestGasPrice(context.Background())
 	// if err != nil {
 	// 	return err
@@ -129,20 +129,20 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 
 	buyerAddress := _exec.getAddressFromKey(privKey)
 
-	// print a before balance so we can see that ether was actually transferred
+	// print a balance before and after so we can see that ether was actually transferred
 	_exec.printBalances(buyerAddress, &contractAddress)
 
 	tx, err := contractInstance.Buy(txOpts)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
-	log.Infof("Tx sent with ID [%s]", tx.Hash().Hex())
+	log.Infof("Tx sent with ID [%s] to buy token [%d]", tx.Hash().Hex(), tokenId)
+	err = _exec.waitForMining(tx.Hash(), 30)
+	if err != nil {
+		return err
+	}
 
-	// TODO: this is not going to work because it's not waiting for the transaction to be mined
-	// TODO: my contract is not transferring the balance to the seller
-	// print an after balance so we can see that ether was actually transferred
 	_exec.printBalances(buyerAddress, &contractAddress)
-
 	return nil
 }
 
