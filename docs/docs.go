@@ -158,7 +158,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "the ID of the order being updated",
+                        "description": "the ID of the order to look up",
                         "name": "orderId",
                         "in": "path",
                         "required": true

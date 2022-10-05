@@ -133,7 +133,7 @@ paths:
         Determines who currently owns the deliver token - the vendor or the customer.
         This looks up the contract in the blockchain rather than reading the status from the database.
       parameters:
-      - description: the ID of the order being updated
+      - description: the ID of the order to look up
         in: path
         name: orderId
         required: true

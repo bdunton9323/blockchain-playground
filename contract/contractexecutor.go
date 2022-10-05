@@ -21,6 +21,8 @@ type DeliveryContractExecutor struct {
 	ServerPrivateKey *ecdsa.PrivateKey
 	ContractAddress  *common.Address
 	ContractInstance *DeliveryToken
+	// where the vendor receives payments and minted delivery tokens
+	VendorAddress *common.Address
 }
 
 // Creates a new DeliveryContractExecutor that can interact with a delivery contract.
@@ -43,9 +45,14 @@ func NewDeliveryContractExecutor(
 		return nil, err
 	}
 
+	vendorPublicKey := privKey.Public()
+	pubKey := vendorPublicKey.(*ecdsa.PublicKey)
+	vendorAddress := crypto.PubkeyToAddress(*pubKey)
+
 	executor := DeliveryContractExecutor{
 		Client:           client,
 		ServerPrivateKey: privKey,
+		VendorAddress:    &vendorAddress,
 	}
 
 	// Either look up the existing contract or deploy a new one
@@ -94,7 +101,7 @@ func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *Deliv
 }
 
 // returns (tokenId, token address, error)
-func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase, buyerPrivateKey string) (*big.Int, string, error) {
+func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, string, error) {
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
 		return nil, "", err
@@ -102,23 +109,11 @@ func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase, buyerPrivateK
 
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
-	// userAddress := common.HexToAddress(purchase.RecipientAddress)
-	//
 	recipientAddress := common.HexToAddress(purchase.RecipientAddress)
-	// _exec.printBalances(&recipientAddress, _exec.ContractAddress)
-	//
-	// txOpts, _, err := _exec.buildTxOptsForCustomerKey(buyerPrivateKey)
-	// if err != nil {
-	// 	return nil, "", err
-	// }
-	//
-	// pay the cost of the order, in wei
-	//txOpts.Value = big.NewInt(purchase.DeliveryPrice.Int64())
 
-	log.Infof("User [%s] is paying [%d] to mint a token token with a delivery cost of [%v]",
+	log.Infof("Minting a token token to be delivered to [%v] for a cost of [%v]",
 		recipientAddress.Hex(),
-		purchase.PurchasePrice,
-		purchase.DeliveryPrice)
+		purchase.PurchasePrice.Int64() + purchase.DeliveryPrice.Int64())
 
 	tx, err := _exec.ContractInstance.MintToken(
 		txOpts,
@@ -262,16 +257,16 @@ func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*
 }
 
 // TODO: since the money isn't stored in the contract, change this to print the vendor's balance
-func (_exec *DeliveryContractExecutor) printBalances(customerAddress *common.Address, contractAddress *common.Address) {
+func (_exec *DeliveryContractExecutor) printBalances(customerAddress *common.Address, vendorAddress *common.Address) {
 	customerBalance, err1 := _exec.Client.BalanceAt(context.Background(), *customerAddress, nil)
-	contractBalance, err2 := _exec.Client.BalanceAt(context.Background(), *contractAddress, nil)
+	contractBalance, err2 := _exec.Client.BalanceAt(context.Background(), *vendorAddress, nil)
 	if err1 == nil && err2 == nil {
 		log.Infof("Customer (address [%s]) balance: %d", customerAddress.Hex(), customerBalance)
-		log.Infof("Contract (address [%s]) balance: %d", contractAddress.Hex(), contractBalance)
+		log.Infof("Vendor (address [%s]) balance: %d", vendorAddress.Hex(), contractBalance)
 	} else {
 		log.Errorf("Failed to get ether balance of [%s] or [%s]. Reason: [%v]",
 			customerAddress.Hex(),
-			contractAddress.Hex(),
+			vendorAddress.Hex(),
 			func() string {
 				if err1 != nil {
 					return err1.Error()

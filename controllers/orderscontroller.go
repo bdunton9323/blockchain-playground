@@ -60,7 +60,6 @@ type ApiError struct {
 // @Produce      json
 // @Param        itemId        query  string  true  "The item to order"
 // @Param        buyerAddress  query  string  true  "the Ethereum address of the user who can accept the delivery"
-// @Param        customerKey   query  string  true  "The private key of the customer, for transferring money"
 // @Success      200  {object}  CreateOrderResponse
 // @Failure      400  {object}  ApiError
 // @Failure      404  {object}  ApiError
@@ -68,14 +67,9 @@ type ApiError struct {
 // @Router       /order [post]
 func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
-	if !validateArgs(ctx, "itemId", "buyerAddress", "customerKey") {
+	if !validateArgs(ctx, "itemId", "buyerAddress") {
 		return
 	}
-
-	// The customer has to transfer money to purchase the goods, so we need their key.
-	// This would be a terrible idea in real life, but this is just a demo of the
-	// contract's functionality.
-	customerPrivateKey := ctx.Query("customerKey")
 
 	itemId := ctx.Query("itemId")
 	orderId := uuid.New().String()
@@ -94,7 +88,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		RecipientAddress: userAddress,
 	}
 
-	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase, customerPrivateKey)
+	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -204,9 +198,8 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// The customer is signing for the order, and they have a different key than
-	// the one loaded into the server. I recognize that transmitting the private
-	// key to a server is a terrible idea, but given the lack of time, it at least
-	// demonstrates the smart contract's functionality.
+	// the one loaded into the server. This would be a terrible idea in real life,
+	// but it demonstrates the functionality of the contract.
 	customerPrivateKey := ctx.Query("customerKey")
 
 	orderId := ctx.Param("orderId")
