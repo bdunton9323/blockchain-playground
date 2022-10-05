@@ -236,6 +236,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	return
 }
 
+// Cancels a pending order. Behind the scenes this burns the token that represents the delivery.
 func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 	orderId := ctx.Param("orderId")
 	order, _ := _Controller.OrderRepository.GetOrder(orderId)
@@ -244,11 +245,17 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	err := _Controller.ContractExecutor.BurnContract(order.OrderId)
+	isDelivered, err := _Controller.ContractExecutor.IsDelivered(order.TokenId)
 	if err != nil {
-		ctx.JSON(500, ApiError{
-			Error: "Failed to cancel the order",
+		// either the token ID is invalid or it was already burned
+		ctx.JSON(400, ApiError{
+			Error: err.Error(),
 		})
+		return
+	}
+
+	if !isDelivered {
+		_Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
 	}
 
 	ctx.JSON(200, OrderStatusResponse{

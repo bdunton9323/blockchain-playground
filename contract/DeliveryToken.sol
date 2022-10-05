@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity >=0.5.0;
 
 import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721Burnable.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
 
+/**
+ * This contract handles the minting and transferring of "delivery tokens". A delivery token is
+ * minted by the vendor when a customer places an order. In order to receive the delivery of the
+ * product, the customer must purchase the token for the sale price.
+ */
 contract DeliveryToken is ERC721, ERC721Burnable {
     event NftBought(address _seller, address _buyer, uint256 _price);
     event NFTMinted(uint256 _tokenId);
@@ -21,22 +28,25 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         vendor = msg.sender;
     }
 
-    // Minting this token represents the customer purchasing something from the vendor for delivery.
-    // The customer can accept delivery by purchasing the token from the one who minted it.
-    // The cost of the order plus shipping is paid when the customer purchases the token.
-    //
-    // allowedPurchaser: the user who is allowed to purchase the token from the owner
-    // deliveryPrice: the price it costs the allowedPurchaser to buy this token
-    // orderPrice: the price of the goods being purchased
-    function mintToken(address allowedPurchaser, uint256 deliveryPrice, uint256 orderPrice, string memory orderId) public payable {
-        // I could have had the customer pay now for the goods and pay the shipping 
-        // later, but that was more complex 
-        //
-        //require(msg.value == orderPrice, "Must pay for order up front");
-        // Pay for the order
-        //payable(vendor).transfer(msg.value);
+    /**
+     * Minting this token represents the customer purchasing something from the vendor for 
+     * delivery.
+     * 
+     * I could have had the customer pay now for the goods and pay the shipping later, but
+     * that was more complex. Alternatively, the customer could deposit the money in the
+     * contract and then on delivery it transfers to the vendor or the vendor sweeps it.
+     * 
+     * allowedPurchaser - the user who is allowed to purchase the token from the owner
+     * deliveryPrice - the price it costs the allowedPurchaser to buy this token
+     * orderPrice - the price of the goods being purchased
+     */
+    function mintToken(
+            address allowedPurchaser, 
+            uint256 deliveryPrice, 
+            uint256 orderPrice, 
+            string memory orderId) public payable {
 
-        // get a token ID and store it so we can look it up later
+        // each token gets a new ID
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
 
@@ -52,15 +62,20 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         emit NFTMinted(tokenId);
     }
 
+    /**
+     * Gets the token ID associated with an order ID
+     */
     function getTokenIdForOrder(string memory orderId) public view returns (uint256) {
         return tokenIdByOrderId[orderId];
     }
 
+    /**
+     * This is a hook called by the parent contract before the token is minted, transferred, or burned.
+     */
     function _beforeTokenTransfer(
-        address from, 
-        address to, 
-        uint256 tokenId
-    ) internal virtual override(ERC721) {
+            address from, 
+            address to, 
+            uint256 tokenId) internal virtual override(ERC721) {
         
         super._beforeTokenTransfer(from, to, tokenId);
 
@@ -70,9 +85,9 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         }
     }
 
-
-    // Buy this token from the owner (receive the physical goods the token represents)
-    // This token can only be bought and transferred once. Buyer beware!
+    /**
+     * Buy this token from the owner (receive the physical goods the token represents)
+     */
     function buy(uint256 tokenId) external payable {
         require(deliveryPriceByTokenId[tokenId] == msg.value, "Wrong purchase price");
 
@@ -80,11 +95,15 @@ contract DeliveryToken is ERC721, ERC721Burnable {
         safeTransferFrom(vendor, msg.sender, tokenId);
 
         // send ETH to the seller
-        payable(vendor).transfer(msg.value);
+        address payable tokenOwner = address(uint256(vendor));
+        tokenOwner.transfer(msg.value);
 
         emit NftBought(vendor, msg.sender, msg.value);
     }
 
+    /**
+     * Destroy the token. This equates to canceling an order that is pending shipment.
+     */
     function burnTokenByOrderId(string memory orderId) public {
         uint256 tokenId = tokenIdByOrderId[orderId];
         require(tokenId != 0, "That token does not exist");
@@ -94,5 +113,4 @@ contract DeliveryToken is ERC721, ERC721Burnable {
 
         super._burn(tokenId);
     }
-
 }

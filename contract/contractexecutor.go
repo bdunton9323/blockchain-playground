@@ -65,7 +65,6 @@ func NewDeliveryContractExecutor(
 		executor.ContractAddress = &addr
 		executor.ContractInstance = contractInstance
 	} else {
-		log.Info("Deploying a new delivery contract")
 		newAddr, contract, err := executor.deployContract()
 		if err != nil {
 			return nil, err
@@ -73,6 +72,10 @@ func NewDeliveryContractExecutor(
 		executor.ContractAddress = newAddr
 		executor.ContractInstance = contract
 	}
+
+	log.Info("Done initializing")
+	log.Infof("    Vendor has an address of [%s]", vendorAddress.Hex())
+	log.Infof("    Contract deployed with address [%s]", executor.ContractAddress.Hex())
 
 	return &executor, nil
 }
@@ -100,7 +103,7 @@ func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *Deliv
 	return &contractAddress, tokenContract, nil
 }
 
-// returns (tokenId, token address, error)
+// returns (tokenId, contract address, error)
 func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, string, error) {
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
@@ -113,7 +116,7 @@ func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, st
 
 	log.Infof("Minting a token token to be delivered to [%v] for a cost of [%v]",
 		recipientAddress.Hex(),
-		purchase.PurchasePrice.Int64() + purchase.DeliveryPrice.Int64())
+		purchase.PurchasePrice.Int64()+purchase.DeliveryPrice.Int64())
 
 	tx, err := _exec.ContractInstance.MintToken(
 		txOpts,
@@ -131,8 +134,6 @@ func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, st
 		return nil, "", err
 	}
 
-	_exec.printBalances(&recipientAddress, _exec.ContractAddress)
-
 	tokenId, err := _exec.ContractInstance.GetTokenIdForOrder(nil, purchase.OrderId)
 	if err != nil {
 		return nil, "", err
@@ -149,7 +150,12 @@ func (_exec *DeliveryContractExecutor) BuyNFT(
 	deliveryPrice int64,
 ) error {
 
-	txOpts, buyerAddress, err := _exec.buildTxOptsForCustomerKey(buyerPrivateKey)
+	privKey, err := crypto.HexToECDSA(buyerPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	txOpts, buyerAddress, err := _exec.buildTxOptsForPrivateKey(privKey)
 
 	// the amount of Ether being sent in the request, in wei
 	txOpts.Value = big.NewInt(price + deliveryPrice)
@@ -163,7 +169,7 @@ func (_exec *DeliveryContractExecutor) BuyNFT(
 	// txOpts.GasPrice = gasPrice
 
 	// print a balance before and after so we can see that ether was actually transferred
-	_exec.printBalances(buyerAddress, _exec.ContractAddress)
+	_exec.printBalances(buyerAddress, _exec.VendorAddress)
 
 	tx, err := _exec.ContractInstance.Buy(txOpts, big.NewInt(tokenId))
 	if err != nil {
@@ -175,41 +181,12 @@ func (_exec *DeliveryContractExecutor) BuyNFT(
 		return err
 	}
 
-	_exec.printBalances(buyerAddress, _exec.ContractAddress)
+	_exec.printBalances(buyerAddress, _exec.VendorAddress)
 	return nil
 }
 
-func (_exec *DeliveryContractExecutor) buildTxOptsForCustomerKey(
-	customerPrivateKey string,
-) (*bind.TransactOpts, *common.Address, error) {
-
-	privKey, err := crypto.HexToECDSA(customerPrivateKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	nonce, err := _exec.getNonce(privKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	txOpts := bind.NewKeyedTransactor(privKey)
-	txOpts.Nonce = nonce
-
-	return txOpts, _exec.getAddressFromKey(privKey), nil
-}
-
-// Returns the owner of the token
+// Returns address of the the token's current owner
 func (_exec *DeliveryContractExecutor) GetOwner(tokenId int64) (string, error) {
-
-	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
-	if err != nil {
-		return "", err
-	}
-
-	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
-	txOpts.Nonce = nonce
-
 	ownerAddress, err := _exec.ContractInstance.OwnerOf(nil, big.NewInt(tokenId))
 
 	if err != nil {
@@ -219,8 +196,20 @@ func (_exec *DeliveryContractExecutor) GetOwner(tokenId int64) (string, error) {
 	return owner, nil
 }
 
+// Checks whether the token has been transferred to the customer
+func (_exec *DeliveryContractExecutor) IsDelivered(tokenId int64) (bool, error) {
+	// the order has been delivered if the token does not reside at the vendor's address
+
+	address, err := _exec.GetOwner(tokenId)
+	if err != nil {
+		return false, errors.New(fmt.Sprintf("Token [%d] does not exist or has been burned", tokenId))
+	}
+
+	return address != _exec.getAddressFromKey(_exec.ServerPrivateKey).Hex(), nil
+}
+
 // Destroys the token
-func (_exec *DeliveryContractExecutor) BurnContract(orderId string) error {
+func (_exec *DeliveryContractExecutor) BurnDeliveryToken(orderId string) error {
 
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
@@ -240,6 +229,20 @@ func (_exec *DeliveryContractExecutor) BurnContract(orderId string) error {
 	return nil
 }
 
+func (_exec *DeliveryContractExecutor) buildTxOptsForPrivateKey(
+	privateKey *ecdsa.PrivateKey,
+) (*bind.TransactOpts, *common.Address, error) {
+	nonce, err := _exec.getNonce(privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	txOpts := bind.NewKeyedTransactor(privateKey)
+	txOpts.Nonce = nonce
+
+	return txOpts, _exec.getAddressFromKey(privateKey), nil
+}
+
 // Gets a nonce to use for the next transaction
 func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*big.Int, error) {
 	publicKey := privateKey.Public()
@@ -256,13 +259,12 @@ func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*
 	return big.NewInt(int64(nonce)), nil
 }
 
-// TODO: since the money isn't stored in the contract, change this to print the vendor's balance
 func (_exec *DeliveryContractExecutor) printBalances(customerAddress *common.Address, vendorAddress *common.Address) {
 	customerBalance, err1 := _exec.Client.BalanceAt(context.Background(), *customerAddress, nil)
-	contractBalance, err2 := _exec.Client.BalanceAt(context.Background(), *vendorAddress, nil)
+	vendorBalance, err2 := _exec.Client.BalanceAt(context.Background(), *vendorAddress, nil)
 	if err1 == nil && err2 == nil {
 		log.Infof("Customer (address [%s]) balance: %d", customerAddress.Hex(), customerBalance)
-		log.Infof("Vendor (address [%s]) balance: %d", vendorAddress.Hex(), contractBalance)
+		log.Infof("Vendor (address [%s]) balance: %d", vendorAddress.Hex(), vendorBalance)
 	} else {
 		log.Errorf("Failed to get ether balance of [%s] or [%s]. Reason: [%v]",
 			customerAddress.Hex(),
