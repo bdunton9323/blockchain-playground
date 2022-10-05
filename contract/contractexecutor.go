@@ -163,18 +163,27 @@ func (_exec *DeliveryContractExecutor) BuyNFT(addressHex string, tokenId int64, 
 	// txOpts.GasLimit = uint64(300000) // in gas units
 	// txOpts.GasPrice = gasPrice
 
-	address := common.HexToAddress(addressHex)
-	contractInstance, err := NewDeliveryToken(address, _exec.Client)
+	contractAddress := common.HexToAddress(addressHex)
+	contractInstance, err := NewDeliveryToken(contractAddress, _exec.Client)
 	if err != nil {
 		return err
 	}
+
+	buyerAddress := _exec.getAddressFromKey(privKey)
+
+	// print a before balance so we can see that ether was actually transferred
+	_exec.printBalances(buyerAddress, &contractAddress)
 
 	tx, err := contractInstance.Buy(txOpts)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error paying for delivery: %v", err))
 	}
-
 	log.Infof("Tx sent with ID [%s]", tx.Hash().Hex())
+
+	// TODO: this is not going to work because it's not waiting for the transaction to be mined
+	// TODO: my contract is not transferring the balance to the seller
+	// print an after balance so we can see that ether was actually transferred
+	_exec.printBalances(buyerAddress, &contractAddress)
 
 	return nil
 }
@@ -246,6 +255,37 @@ func (_exec *DeliveryContractExecutor) getNonce(privateKey *ecdsa.PrivateKey) (*
 	}
 
 	return big.NewInt(int64(nonce)), nil
+}
+
+func (_exec *DeliveryContractExecutor) printBalances(customerAddress *common.Address, contractAddress *common.Address) {
+	customerBalance, err1 := _exec.Client.BalanceAt(context.Background(), *customerAddress, nil)
+	contractBalance, err2 := _exec.Client.BalanceAt(context.Background(), *contractAddress, nil)
+	if err1 == nil && err2 == nil {
+		log.Infof("Customer (address [%s]) balance: %d", customerAddress.Hex(), customerBalance)
+		log.Infof("Contract (address [%s]) balance: %d", contractAddress.Hex(), contractBalance)
+	} else {
+		log.Errorf("Failed to get ether balance of [%s] or [%s]. Reason: [%v]",
+			customerAddress.Hex(),
+			contractAddress.Hex(),
+			func() string {
+				if err1 != nil {
+					return err1.Error()
+				} else {
+					return err2.Error()
+				}
+			}())
+	}
+}
+
+// Converts a private key to the address
+func (_exec *DeliveryContractExecutor) getAddressFromKey(privateKey *ecdsa.PrivateKey) *common.Address {
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return nil
+	}
+	address := crypto.PubkeyToAddress(*publicKeyECDSA)
+	return &address
 }
 
 // There is some functionalilty in the ABI bindings for subscribing to an events channel to watch for events
