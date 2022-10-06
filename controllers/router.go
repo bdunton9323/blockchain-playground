@@ -37,6 +37,10 @@ func (_apiRouter *ApiRouter) Start() {
 		_apiRouter.orderController.UpdateOrderStatus(ctx)
 	})
 
+	router.POST("/api/v1/payment/order/:orderId", func(ctx *gin.Context) {
+		_apiRouter.orderController.PayForOrder(ctx)
+	})
+
 	router.GET("/api/v1/order/:orderId/owner", func(ctx *gin.Context) {
 		_apiRouter.orderController.GetDeliveryTokenOwner(ctx)
 	})

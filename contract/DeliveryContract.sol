@@ -26,7 +26,14 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     // the address where money can be sent to the vendor from the customer
     address vendor;
 
-    mapping(uint256 => uint256) public deliveryPriceByTokenId;
+    struct Order {
+        uint256 deliveryPrice;
+        uint256 orderPrice;
+        address allowedRecipient;
+    }
+
+    // some mappings to keep state between the various transactions
+    mapping(uint256 => Order) private orderByTokenId;
     mapping(string => uint256) private tokenIdByOrderId;
 
     constructor() ERC721("DeliveryToken", "DLV") public {
@@ -46,7 +53,7 @@ contract DeliveryContract is ERC721, ERC721Burnable {
      * orderPrice - the price of the goods being purchased
      */
     function mintToken(
-            address allowedPurchaser, 
+            address allowedPurchaser,
             uint256 deliveryPrice, 
             uint256 orderPrice, 
             string memory orderId) public payable {
@@ -55,16 +62,29 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
 
-        deliveryPriceByTokenId[tokenId] = orderPrice + deliveryPrice;
+        // deliveryPriceByTokenId[tokenId] = deliveryPrice;
+        // orderPriceByTokenId[tokenId] = orderPrice;
+        // recipientByTokenId[tokenId] = allowedPurchaser;
         tokenIdByOrderId[orderId] = tokenId;
+        Order memory order = Order(deliveryPrice, orderPrice, allowedPurchaser);
+        orderByTokenId[tokenId] = order;
 
         // the vendor starts out owning the token because they own the goods until paid
         _safeMint(vendor, tokenId);
 
-        // approve the customer to buy the token from the vendor
-        approve(allowedPurchaser, tokenId);
-
         emit NFTMinted(tokenId);
+    }
+
+    function payForGoods(uint256 tokenId) public payable {
+        require(_exists(tokenId), "That token does not exist");
+
+        Order memory order = orderByTokenId[tokenId];
+        require(msg.value == order.orderPrice, "Must pay for the item in full");
+
+        // The money now lives in the contract and can be withdrawn by the vendor.
+        // Only after the user has paid for the goods is the customer allowed to accept delivery.
+        // Anyone can pay for the order, but only one user can accept delivery.
+        approve(order.allowedRecipient, tokenId);
     }
 
     /**
@@ -72,6 +92,57 @@ contract DeliveryContract is ERC721, ERC721Burnable {
      */
     function getTokenIdForOrder(string memory orderId) public view returns (uint256) {
         return tokenIdByOrderId[orderId];
+    }
+
+    /**
+     * Buy this token from the owner (receive the physical goods the token represents)
+     */
+    function buy(uint256 tokenId) external payable {
+        require(_exists(tokenId), "That token does not exist");
+
+        Order memory order = orderByTokenId[tokenId];
+        require(msg.value == order.deliveryPrice, "Must pay for delivery");
+
+        // give the token to the buyer
+        safeTransferFrom(vendor, msg.sender, tokenId);
+
+        // send ETH to the seller
+        address payable tokenOwner = address(uint256(vendor));
+        tokenOwner.transfer(msg.value);
+
+        emit NftBought(vendor, msg.sender, msg.value);
+    }
+
+    /**
+     * Destroy the token. This equates to canceling an order that is pending shipment.
+     */
+    function burnTokenByOrderId(string memory orderId) public {
+        uint256 tokenId = tokenIdByOrderId[orderId];
+        require(tokenId != 0, "That token does not exist");
+
+        Order memory order = orderByTokenId[tokenId];
+
+        // refund the purchase price if the order has not been delivered
+        if (ownerOf(tokenId) == vendor) {
+            payable(order.allowedRecipient).transfer(order.orderPrice);
+        }
+
+        delete(tokenIdByOrderId[orderId]);
+        delete(orderByTokenId[tokenId]);
+
+        super._burn(tokenId);
+    }
+
+    // allows the vendor to withdraw the money from all the customer purchases and deliveries
+    function withdraw(uint256 tokenId) public {
+        require(msg.sender == vendor, "Only the vendor can withdraw their money");
+        
+        Order memory order = orderByTokenId[tokenId];
+
+        // can only withdraw money after delivery
+        if (ownerOf(tokenId) != vendor) {
+            payable(vendor).transfer(order.orderPrice + order.deliveryPrice);
+        }
     }
 
     /**
@@ -93,34 +164,5 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         if (to == address(0)) {
             require(_isApprovedOrOwner(from, tokenId), "not approved to burn this token");
         }
-    }
-
-    /**
-     * Buy this token from the owner (receive the physical goods the token represents)
-     */
-    function buy(uint256 tokenId) external payable {
-        require(deliveryPriceByTokenId[tokenId] == msg.value, "Wrong purchase price");
-
-        // give the token to the buyer
-        safeTransferFrom(vendor, msg.sender, tokenId);
-
-        // send ETH to the seller
-        address payable tokenOwner = address(uint256(vendor));
-        tokenOwner.transfer(msg.value);
-
-        emit NftBought(vendor, msg.sender, msg.value);
-    }
-
-    /**
-     * Destroy the token. This equates to canceling an order that is pending shipment.
-     */
-    function burnTokenByOrderId(string memory orderId) public {
-        uint256 tokenId = tokenIdByOrderId[orderId];
-        require(tokenId != 0, "That token does not exist");
-        
-        delete(deliveryPriceByTokenId[tokenId]);
-        delete(tokenIdByOrderId[orderId]);
-
-        super._burn(tokenId);
     }
 }

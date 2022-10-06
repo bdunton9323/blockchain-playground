@@ -127,6 +127,53 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	}
 }
 
+// PayForOrder   godoc
+// @Summary      Pays ether from the customer to the delivery contract for the price of the goods
+// @Description  This action changes the status of an order, either by accepting delivery or canceling it
+// @Tags         order
+// @Accept       json
+// @Produce      json
+// @Param        request        body   OrderUpdateRequest true  "Indicates the status of the order. One of ('canceled', 'delivered')"
+// @Param        customerKey    query  string             false "If this is a delivery, the delivery recipient's private key (not a good idea in real life!)"
+// @Param        orderId        path   string             true  "the ID of the order being updated"
+// @Success      200  {object}  OrderStatusResponse
+// @Failure      400  {object}  ApiError
+// @Failure      404  {object}  ApiError
+// @Failure      500  {object}  ApiError
+// @Router       /order/{orderId} [post]
+func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
+	if !validateArgs(ctx, "customerKey") {
+		return
+	}
+
+	// The customer is signing for the order, and they have a different key than
+	// the one loaded into the server. This would be a terrible idea in real life,
+	// but it demonstrates the functionality of the contract.
+	customerPrivateKey := ctx.Query("customerKey")
+
+	orderId := ctx.Param("orderId")
+	log.Infof("Delivering order [%v]", orderId)
+
+	order, err := _Controller.OrderRepository.GetOrder(orderId)
+	if err != nil {
+		ctx.JSON(500, ApiError{
+			Error: err.Error(),
+		})
+		return
+	} else if order == nil || order.Delivered {
+		orderNotFoundResponse(ctx, orderId)
+		return
+	}
+
+	err = _Controller.ContractExecutor.PayForGoods(order.TokenId, customerPrivateKey, order.Price)
+	if err != nil {
+		ctx.JSON(500, ApiError{
+			Error: err.Error(),
+		})
+		return
+	}
+}
+
 // DeliverOrder  godoc
 // @Summary      Update order status
 // @Description  This action changes the status of an order, either by accepting delivery or canceling it
@@ -220,12 +267,23 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = _Controller.ContractExecutor.BuyNFT(order.TokenId, customerPrivateKey, order.Price, deliveryPrice)
+	err = _Controller.ContractExecutor.DeliverOrderAndPayVendor(
+		order.TokenId, 
+		customerPrivateKey, 
+		order.Price, deliveryPrice)
+		
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),
 		})
 		return
+	}
+
+	err = _Controller.ContractExecutor.PayVendor(order.TokenId)
+	if err != nil {
+		// since the token has already transferred, there is nothing that can be done at this point
+		// from the customer's perspective.
+		log.Error("Could not pay the vendor: %v", err)
 	}
 
 	_Controller.OrderRepository.MarkOrderDelivered(orderId)
