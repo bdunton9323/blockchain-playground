@@ -14,7 +14,6 @@ import (
 
 // the URL of the ethereum node (I used Quorum running locally)
 var ethNodeUrl = "http://172.13.3.1:8545"
-
 var dbHost = "127.0.0.1:3306"
 var dbName = "orderdb"
 var dbUser = "db_user"

@@ -74,7 +74,7 @@ var deliveryPrice int64 = 75
 // @Failure      404  {object}  ApiError
 // @Failure      500  {object}  ApiError
 // @Router       /order [post]
-func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
+func (_ctrl *OrderController) CreateOrder(ctx *gin.Context) {
 
 	if !validateArgs(ctx, "itemId", "buyerAddress") {
 		return
@@ -93,7 +93,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		RecipientAddress: userAddress,
 	}
 
-	tokenId, address, err := _Controller.ContractExecutor.MintNFT(purchase)
+	tokenId, address, err := _ctrl.ContractExecutor.MintNFT(purchase)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -113,7 +113,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		Delivered:     false,
 	}
 
-	err = _Controller.OrderRepository.CreateOrder(order)
+	err = _ctrl.OrderRepository.CreateOrder(order)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: "Error writing order to database",
@@ -139,7 +139,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 // @Failure      404  {object}  ApiError
 // @Failure      500  {object}  ApiError
 // @Router       /payment/order/{orderId} [post]
-func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
+func (_ctrl *OrderController) PayForOrder(ctx *gin.Context) {
 	if !validateArgs(ctx, "customerKey") {
 		return
 	}
@@ -150,7 +150,7 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 	customerPrivateKey := ctx.Query("customerKey")
 
 	orderId := ctx.Param("orderId")
-	order, err := _Controller.OrderRepository.GetOrder(orderId)
+	order, err := _ctrl.OrderRepository.GetOrder(orderId)
 	if err != nil {
 		ctx.JSON(400, ApiError{
 			Error: err.Error(),
@@ -162,7 +162,7 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 	}
 
 	log.Infof("Paying [%d] ether for order [%v]", orderId)
-	err = _Controller.ContractExecutor.PayForGoods(order.TokenId, customerPrivateKey, order.Price)
+	err = _ctrl.ContractExecutor.PayForGoods(order.TokenId, customerPrivateKey, order.Price)
 	if err != nil {
 		ctx.JSON(400, ApiError{
 			Error: err.Error(),
@@ -187,14 +187,14 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 // @Failure      404  {object}  ApiError
 // @Failure      500  {object}  ApiError
 // @Router       /order/{orderId} [post]
-func (_Controller *OrderController) UpdateOrderStatus(ctx *gin.Context) {
+func (_ctrl *OrderController) UpdateOrderStatus(ctx *gin.Context) {
 	var req OrderUpdateRequest
 	ctx.BindJSON(&req)
 
 	if strings.EqualFold(req.Status, "delivered") {
-		_Controller.deliverOrder(ctx)
+		_ctrl.deliverOrder(ctx)
 	} else if strings.EqualFold(req.Status, "burned") {
-		_Controller.burnToken(ctx)
+		_ctrl.burnToken(ctx)
 	} else {
 		ctx.JSON(400, ApiError{
 			Error: "Invalid status. Expected 'delivered' or 'burned'",
@@ -217,16 +217,16 @@ func (_Controller *OrderController) UpdateOrderStatus(ctx *gin.Context) {
 // @Failure      404  {object}  ApiError
 // @Failure      500  {object}  ApiError
 // @Router       /order/{orderId}/owner [get]
-func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
+func (_ctrl *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
 
 	orderId := ctx.Param("orderId")
-	order, _ := _Controller.OrderRepository.GetOrder(orderId)
+	order, _ := _ctrl.OrderRepository.GetOrder(orderId)
 	if order == nil {
 		orderNotFoundResponse(ctx, orderId)
 		return
 	}
 
-	owner, err := _Controller.ContractExecutor.GetOwner(order.TokenId)
+	owner, err := _ctrl.ContractExecutor.GetOwner(order.TokenId)
 
 	if err != nil {
 		ctx.JSON(500, ApiError{
@@ -241,7 +241,7 @@ func (_Controller *OrderController) GetDeliveryTokenOwner(ctx *gin.Context) {
 
 // Delivers the order to the customer. This is represented by transferring the token from the vendor to
 // the customer, and transferring Ether from the customer to the vendor to pay for shipping.
-func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
+func (_ctrl *OrderController) deliverOrder(ctx *gin.Context) {
 	if !validateArgs(ctx, "customerKey") {
 		return
 	}
@@ -254,7 +254,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	orderId := ctx.Param("orderId")
 	log.Infof("Delivering order [%v]", orderId)
 
-	order, err := _Controller.OrderRepository.GetOrder(orderId)
+	order, err := _ctrl.OrderRepository.GetOrder(orderId)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),
@@ -266,7 +266,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = _Controller.ContractExecutor.DeliverOrder(
+	err = _ctrl.ContractExecutor.DeliverOrder(
 		order.TokenId,
 		customerPrivateKey,
 		deliveryPrice)
@@ -278,7 +278,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 		return
 	}
 
-	_Controller.OrderRepository.MarkOrderDelivered(orderId)
+	_ctrl.OrderRepository.MarkOrderDelivered(orderId)
 
 	ctx.JSON(200, OrderStatusResponse{
 		Status: "delivered",
@@ -288,15 +288,15 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 }
 
 // Cancels a pending order. Behind the scenes this burns the token that represents the delivery.
-func (_Controller *OrderController) burnToken(ctx *gin.Context) {
+func (_ctrl *OrderController) burnToken(ctx *gin.Context) {
 	orderId := ctx.Param("orderId")
-	order, _ := _Controller.OrderRepository.GetOrder(orderId)
+	order, _ := _ctrl.OrderRepository.GetOrder(orderId)
 	if order == nil {
 		orderNotFoundResponse(ctx, orderId)
 		return
 	}
 
-	_, err := _Controller.ContractExecutor.IsDelivered(order.TokenId)
+	_, err := _ctrl.ContractExecutor.IsDelivered(order.TokenId)
 	if err != nil {
 		// either the token ID is invalid or it was already burned
 		ctx.JSON(400, ApiError{
@@ -308,7 +308,7 @@ func (_Controller *OrderController) burnToken(ctx *gin.Context) {
 	// An error from here could indicate that the token was already burned,
 	// did not exist, or that an unapproved user attempted to burn it. This isn't
 	// robust enough to differentiate, but it's almost certainly a client error.
-	err = _Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
+	err = _ctrl.ContractExecutor.BurnDeliveryToken(order.OrderId)
 	if err != nil {
 		ctx.JSON(400, ApiError{
 			Error: err.Error(),

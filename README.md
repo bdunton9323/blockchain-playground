@@ -115,6 +115,12 @@ These can all be done through the swagger UI or your tool of choice.
         'http://localhost:8080/api/v1/order/{orderId}/owner' \
         -H 'accept: application/json'
     ```
+3. Pay for the order:
+    ```
+    curl -X 'POST' \
+        'http://localhost:8080/api/v1/payment/order/{orderId}?customerKey=e958f5d3e336803b8b23c389e77d6b29a74ff0d369f0a1d8aeeec1e27254624b' \
+        -H 'accept: application/json'
+    ```
 3. Accept delivery of the order:
     This will cause the customer to purchase the token from the vendor for the total cost plus shipping.
     Transmitting your private key to a server is not a realistic scenario, but it serves the purpose for the demo.
@@ -135,10 +141,10 @@ These can all be done through the swagger UI or your tool of choice.
     The customer does not need to retain the delivery receipt forever, so destroy it!
     ```
     curl -X 'POST' \
-        'http://localhost:8080/api/v1/order/c5127170-997e-4038-a2b2-a85af94a633c?customerKey=e958f5d3e336803b8b23c389e77d6b29a74ff0d369f0a1d8aeeec1e27254624b' \
+        'http://localhost:8080/api/v1/order/{orderId}?customerKey=e958f5d3e336803b8b23c389e77d6b29a74ff0d369f0a1d8aeeec1e27254624b' \
         -H 'accept: application/json' \
         -H 'Content-Type: application/json' \
-        -d '{"status": "canceled"}'
+        -d '{"status": "burned"}'
     ```
 6. See that the token no longer exists
    ```
