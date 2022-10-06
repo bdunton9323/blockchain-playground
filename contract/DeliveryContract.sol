@@ -7,11 +7,16 @@ import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721Burnable.sol"
 import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
 
 /**
- * This contract handles the minting and transferring of "delivery tokens". A delivery token is
+ * This is a contract between a vendor and a customer, representing the agreement to deliver
+ * a shipment at the agreed-upon price.
+ * 
+ * This contract handles the minting and transferring of ERC721 "delivery tokens". A delivery token is
  * minted by the vendor when a customer places an order. In order to receive the delivery of the
  * product, the customer must purchase the token for the sale price.
+ * 
+ * This contract manages the whole collection of delivery tokens that the vendor has minted.
  */
-contract DeliveryToken is ERC721, ERC721Burnable {
+contract DeliveryContract is ERC721, ERC721Burnable {
     event NftBought(address _seller, address _buyer, uint256 _price);
     event NFTMinted(uint256 _tokenId);
 

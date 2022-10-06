@@ -61,7 +61,7 @@ Spin up a fresh database locally.
    ```
 2. This will take a minute to come up. Run `docker ps` and Make sure you see `mariadb` in the list of running containers
 
-   You can Connect to the database with your favorite tool. I use `mysql-client` from the linux package manager. Connect
+   mainYou can Connect to the database with your favorite tool. I use `mysql-client` from the linux package manager. Connect
    with the following credentials:
    - username: db_user
    - password: mysqlPassword
@@ -112,7 +112,7 @@ These can all be done through the swagger UI or your tool of choice.
 2. Grab the order ID from the response and use it to see who owns the token. This executes a method in the contract.
     ```
     curl -X 'GET' \
-        'http://localhost:8080/api/v1/order/{orderId}' \
+        'http://localhost:8080/api/v1/order/{orderId}/owner' \
         -H 'accept: application/json'
     ```
 3. Accept delivery of the order:
@@ -120,7 +120,7 @@ These can all be done through the swagger UI or your tool of choice.
     Transmitting your private key to a server is not a realistic scenario, but it serves the purpose for the demo.
     ```
     curl -X 'POST' \
-        'http://localhost:8080/api/v1/order/c5127170-997e-4038-a2b2-a85af94a633c?customerKey=e958f5d3e336803b8b23c389e77d6b29a74ff0d369f0a1d8aeeec1e27254624b' \
+        'http://localhost:8080/api/v1/order/{orderId}?customerKey=e958f5d3e336803b8b23c389e77d6b29a74ff0d369f0a1d8aeeec1e27254624b' \
         -H 'accept: application/json' \
         -H 'Content-Type: application/json' \
         -d '{"status": "delivered"}'
@@ -128,7 +128,7 @@ These can all be done through the swagger UI or your tool of choice.
 4. See that the customer now owns the token:
    ```
     curl -X 'GET' \
-        'http://localhost:8080/api/v1/order/{orderId}' \
+        'http://localhost:8080/api/v1/order/{orderId}/owner' \
         -H 'accept: application/json'
     ```
 5. Burn the token
@@ -139,6 +139,12 @@ These can all be done through the swagger UI or your tool of choice.
         -H 'accept: application/json' \
         -H 'Content-Type: application/json' \
         -d '{"status": "canceled"}'
+    ```
+6. See that the token no longer exists
+   ```
+    curl -X 'GET' \
+        'http://localhost:8080/api/v1/order/{orderId}/owner' \
+        -H 'accept: application/json'
     ```
 
 ## Developing

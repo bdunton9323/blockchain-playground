@@ -20,7 +20,7 @@ type DeliveryContractExecutor struct {
 	Client           *ethclient.Client
 	ServerPrivateKey *ecdsa.PrivateKey
 	ContractAddress  *common.Address
-	ContractInstance *DeliveryToken
+	ContractInstance *DeliveryContract
 	// where the vendor receives payments and minted delivery tokens
 	VendorAddress *common.Address
 }
@@ -58,7 +58,7 @@ func NewDeliveryContractExecutor(
 	// Either look up the existing contract or deploy a new one
 	if contractAddress != nil && len(*contractAddress) != 0 {
 		addr := common.HexToAddress(*contractAddress)
-		contractInstance, err := NewDeliveryToken(addr, client)
+		contractInstance, err := NewDeliveryContract(addr, client)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func NewDeliveryContractExecutor(
 	return &executor, nil
 }
 
-func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *DeliveryToken, error) {
+func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *DeliveryContract, error) {
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
 	if err != nil {
 		return nil, nil, err
@@ -89,7 +89,7 @@ func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *Deliv
 	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
 	txOpts.Nonce = nonce
 
-	contractAddress, tx, tokenContract, err := DeployDeliveryToken(txOpts, _exec.Client)
+	contractAddress, tx, tokenContract, err := DeployDeliveryContract(txOpts, _exec.Client)
 	if err != nil {
 		return nil, nil, errors.New(fmt.Sprintf("Error deploying token contract: %v", err))
 	}
@@ -319,7 +319,7 @@ func (_exec *DeliveryContractExecutor) waitForMining(txHash common.Hash, maxWait
 // is no long-lived connection there. I am leaving the code here regardless.
 // ----
 //
-// func waitForMint(contractInstance *DeliveryToken) {
+// func waitForMint(contractInstance *DeliveryContract) {
 // 	log.Info("Waiting for the emitted event")
 //
 // 	var wg sync.WaitGroup
@@ -328,17 +328,17 @@ func (_exec *DeliveryContractExecutor) waitForMining(txHash common.Hash, maxWait
 // 	wg.Wait()
 // }
 //
-// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *DeliveryToken) {
+// func listenForMintedEvent(ctx context.Context, wg *sync.WaitGroup, contract *DeliveryContract) {
 // 	defer wg.Done()
 //
-// 	events := make(chan *DeliveryTokenNFTMinted)
+// 	events := make(chan *DeliveryContractNFTMinted)
 //
 // 	start := uint64(0)
 // 	watchOpts := &bind.WatchOpts{
 // 		Start: &start,
 // 		Context: ctx,
 // 	}
-// 	subscription, err := contract.DeliveryTokenFilterer.WatchNFTMinted(watchOpts, events)
+// 	subscription, err := contract.DeliveryContractFilterer.WatchNFTMinted(watchOpts, events)
 // 	if err != nil {
 // 		log.Errorf("Could not watch for token minting event: %v", err)
 // 	}

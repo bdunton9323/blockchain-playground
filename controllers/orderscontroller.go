@@ -242,7 +242,7 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	isDelivered, err := _Controller.ContractExecutor.IsDelivered(order.TokenId)
+	_, err := _Controller.ContractExecutor.IsDelivered(order.TokenId)
 	if err != nil {
 		// either the token ID is invalid or it was already burned
 		ctx.JSON(400, ApiError{
@@ -251,9 +251,9 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	if !isDelivered {
-		_Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
-	}
+	//if !isDelivered {
+	_Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
+	//}
 
 	ctx.JSON(200, OrderStatusResponse{
 		Status: "canceled",

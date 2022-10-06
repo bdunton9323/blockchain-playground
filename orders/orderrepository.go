@@ -135,6 +135,6 @@ func (repo *MariaDBOrderRepository) MarkOrderDelivered(orderId string) error {
 
 // Runs the given query against the database
 func (repo *MariaDBOrderRepository) runQuery(query string) (*sql.Rows, error) {
-	log.Infof("running query [%s]", query)
+	log.Debugf("running query [%s]", query)
 	return repo.conn.Query(query)
 }
