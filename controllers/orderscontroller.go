@@ -24,7 +24,7 @@ type OrderController struct {
 	ContractExecutor *contract.DeliveryContractExecutor
 }
 
-// The request body for updating the status of an order. One of "delivered" or "canceled".
+// The request body for updating the status of an order. One of "delivered" or "burned".
 type OrderUpdateRequest struct {
 	// indicates the desired new status of the order
 	Status string `json:"status"`
@@ -150,11 +150,9 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 	customerPrivateKey := ctx.Query("customerKey")
 
 	orderId := ctx.Param("orderId")
-	log.Infof("Delivering order [%v]", orderId)
-
 	order, err := _Controller.OrderRepository.GetOrder(orderId)
 	if err != nil {
-		ctx.JSON(500, ApiError{
+		ctx.JSON(400, ApiError{
 			Error: err.Error(),
 		})
 		return
@@ -163,9 +161,10 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 		return
 	}
 
+	log.Infof("Paying [%d] ether for order [%v]", orderId)
 	err = _Controller.ContractExecutor.PayForGoods(order.TokenId, customerPrivateKey, order.Price)
 	if err != nil {
-		ctx.JSON(500, ApiError{
+		ctx.JSON(400, ApiError{
 			Error: err.Error(),
 		})
 		return
@@ -180,7 +179,7 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 // @Tags         order
 // @Accept       json
 // @Produce      json
-// @Param        request        body   OrderUpdateRequest true  "Indicates the status of the order. One of ('canceled', 'delivered')"
+// @Param        request        body   OrderUpdateRequest true  "Indicates the status of the order. One of ('canceled', 'burned')"
 // @Param        customerKey    query  string             false "If this is a delivery, the delivery recipient's private key (not a good idea in real life!)"
 // @Param        orderId        path   string             true  "the ID of the order being updated"
 // @Success      200  {object}  OrderStatusResponse
@@ -194,11 +193,11 @@ func (_Controller *OrderController) UpdateOrderStatus(ctx *gin.Context) {
 
 	if strings.EqualFold(req.Status, "delivered") {
 		_Controller.deliverOrder(ctx)
-	} else if strings.EqualFold(req.Status, "canceled") {
-		_Controller.cancelOrder(ctx)
+	} else if strings.EqualFold(req.Status, "burned") {
+		_Controller.burnToken(ctx)
 	} else {
 		ctx.JSON(400, ApiError{
-			Error: "Invalid status. Expected 'delivered' or 'canceled'",
+			Error: "Invalid status. Expected 'delivered' or 'burned'",
 		})
 	}
 }
@@ -289,7 +288,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 }
 
 // Cancels a pending order. Behind the scenes this burns the token that represents the delivery.
-func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
+func (_Controller *OrderController) burnToken(ctx *gin.Context) {
 	orderId := ctx.Param("orderId")
 	order, _ := _Controller.OrderRepository.GetOrder(orderId)
 	if order == nil {
@@ -308,11 +307,17 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 
 	// An error from here could indicate that the token was already burned,
 	// did not exist, or that an unapproved user attempted to burn it. This isn't
-	// robust enough to differentiate.
-	_Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
+	// robust enough to differentiate, but it's almost certainly a client error.
+	err = _Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
+	if err != nil {
+		ctx.JSON(400, ApiError{
+			Error: err.Error(),
+		})
+		return
+	}
 
 	ctx.JSON(200, OrderStatusResponse{
-		Status: "canceled",
+		Status: "burned",
 	})
 }
 

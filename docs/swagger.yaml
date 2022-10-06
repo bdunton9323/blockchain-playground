@@ -92,7 +92,7 @@ paths:
       description: This action changes the status of an order, either by accepting
         delivery or canceling it
       parameters:
-      - description: Indicates the status of the order. One of ('canceled', 'delivered')
+      - description: Indicates the status of the order. One of ('canceled', 'burned')
         in: body
         name: request
         required: true
@@ -169,8 +169,6 @@ paths:
     post:
       consumes:
       - application/json
-      description: This action changes the status of an order, either by accepting
-        delivery or canceling it
       parameters:
       - description: If this is a delivery, the delivery recipient's private key (not
           a good idea in real life!)

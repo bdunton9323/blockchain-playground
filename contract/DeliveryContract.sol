@@ -11,8 +11,10 @@ import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
  * a shipment at the agreed-upon price.
  * 
  * This contract handles the minting and transferring of ERC721 "delivery tokens". A delivery token is
- * minted by the vendor when a customer places an order. In order to receive the delivery of the
- * product, the customer must purchase the token for the sale price.
+ * a promise of future delivery, assuming payment is sent. It is minted by the vendor when a customer 
+ * places an order. When the order is paid for, the customer's money sits in the contract in escrow
+ * until the shipment is delivered. To receive the package, the customer must purchase the token for 
+ * the shipping price. The customer now owns the token and can burn it if they desire.
  * 
  * This contract manages the whole collection of delivery tokens that the vendor has minted.
  */
@@ -45,13 +47,10 @@ contract DeliveryContract is ERC721, ERC721Burnable {
      * Minting this token represents the customer purchasing something from the vendor for 
      * delivery.
      * 
-     * I could have had the customer pay now for the goods and pay the shipping later, but
-     * that was more complex. Alternatively, the customer could deposit the money in the
-     * contract and then on delivery it transfers to the vendor or the vendor sweeps it.
-     * 
      * allowedPurchaser - the user who is allowed to purchase the token from the owner
      * deliveryPrice - the price it costs the allowedPurchaser to buy this token
      * orderPrice - the price of the goods being purchased
+     * orderId - the unique ID for this order
      */
     function mintToken(
             address allowedPurchaser,
@@ -63,12 +62,13 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
 
+        // manage some internal mappings for state machine enforcement
         tokenIdByOrderId[orderId] = tokenId;
         Order memory order = Order(deliveryPrice, orderPrice, allowedPurchaser);
         orderByTokenId[tokenId] = order;
         paidByTokenId[tokenId] = false;
 
-        // the vendor starts out owning the token because they own the goods until paid
+        // the vendor starts out owning the token because they own the goods for now
         _safeMint(vendor, tokenId);
 
         // the customer is allowed to receive delivery
@@ -77,13 +77,16 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         emit NFTMinted(tokenId);
     }
 
-    // This is called when the customer pays for the order. The money for the order
-    // is stored in the contract, to be transferred to the vendor upon delivery.
+    /**
+     * This is called when the customer pays for the order. The money for the order
+     * is held in the contract, to be transferred to the vendor upon delivery.
+     */
     function payForGoods(uint256 tokenId) public payable {
         require(_exists(tokenId), "That token does not exist");
         require(paidByTokenId[tokenId] == false, "This order was paid for already");
 
         Order memory order = orderByTokenId[tokenId];
+        require(msg.sender == order.allowedRecipient, "Only the recipient can pay for the order");
         require(msg.value == order.orderPrice, "Must pay for the item in full");
 
         paidByTokenId[tokenId] = true;
@@ -97,21 +100,20 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     }
 
     /**
-     * Buy this token from the owner (receive the physical goods the token represents)
+     * Buy this token from the vendor (receive the physical goods the token represents)
      */
     function buy(uint256 tokenId) external payable {
         require(_exists(tokenId), "That token does not exist");
+        require(paidByTokenId[tokenId] == true, "Order must be paid in full before delivery");
 
         Order memory order = orderByTokenId[tokenId];
-        require(msg.value == order.deliveryPrice, "Must pay for delivery");
+        require(msg.value == order.deliveryPrice, "Must pay the shipping costs to accept delivery");
         
-        //require(address(this).balance >= totalAmount, "The vendor didn't get paid");
-        require(paidByTokenId[tokenId] == true, "Order must be paid for first");
-
         // give the token to the buyer
         safeTransferFrom(vendor, msg.sender, tokenId);
 
         // send the shipping cost plus delivery cost to the seller
+        // if the state machine is working, there is guaranteed to be enough money in the contract
         address payable tokenOwner = address(uint256(vendor));
         tokenOwner.transfer(msg.value + order.orderPrice);
 
@@ -119,7 +121,7 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     }
 
     /**
-     * Destroy the token. This equates to canceling an order that is pending shipment.
+     * Destroy the token. Only the customer can burn the token, and only after delivery.
      */
     function burnTokenByOrderId(string memory orderId) public {
         uint256 tokenId = tokenIdByOrderId[orderId];
@@ -132,20 +134,9 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         super._burn(tokenId);
     }
 
-    // allows the vendor to withdraw the money from all the customer purchases and deliveries
-    // function withdraw(uint256 tokenId) public {
-    //     require(msg.sender == vendor, "Only the vendor can withdraw their money");
-        
-    //     Order memory order = orderByTokenId[tokenId];
-
-    //     // can only withdraw money after delivery
-    //     if (ownerOf(tokenId) != vendor) {
-    //         payable(vendor).transfer(order.orderPrice + order.deliveryPrice);
-    //     }
-    // }
-
     /**
      * This is a hook called by the parent contract before the token is minted, transferred, or burned.
+     * The base contract is more lenient than our state machine.
      */
     function _beforeTokenTransfer(
             address from, 

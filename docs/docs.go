@@ -92,7 +92,7 @@ const docTemplate = `{
                 "summary": "Update order status",
                 "parameters": [
                     {
-                        "description": "Indicates the status of the order. One of ('canceled', 'delivered')",
+                        "description": "Indicates the status of the order. One of ('canceled', 'burned')",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -194,7 +194,6 @@ const docTemplate = `{
         },
         "/payment/order/{orderId}": {
             "post": {
-                "description": "This action changes the status of an order, either by accepting delivery or canceling it",
                 "consumes": [
                     "application/json"
                 ],
