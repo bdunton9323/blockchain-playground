@@ -205,16 +205,16 @@ const docTemplate = `{
         "controllers.CreateOrderResponse": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
                 "contractAddress": {
+                    "description": "The address of the contract that manages this token",
                     "type": "string"
                 },
                 "message": {
+                    "description": "The ID of the delivery token. A tokenId is unique within a given contract.",
                     "type": "string"
                 },
                 "orderId": {
+                    "description": "The unique ID of the order",
                     "type": "string"
                 }
             }
@@ -223,6 +223,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "status": {
+                    "description": "indicates the actual resulting status of the order",
                     "type": "string"
                 }
             }
@@ -231,6 +232,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "status": {
+                    "description": "indicates the desired new status of the order",
                     "type": "string"
                 }
             }
@@ -239,6 +241,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "owner": {
+                    "description": "The ethereum address of the token holder",
                     "type": "string",
                     "format": "address"
                 }

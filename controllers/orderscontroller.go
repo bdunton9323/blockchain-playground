@@ -26,24 +26,29 @@ type OrderController struct {
 
 // The request body for updating the status of an order. One of "delivered" or "canceled".
 type OrderUpdateRequest struct {
+	// indicates the desired new status of the order
 	Status string `json:"status"`
 }
 
 // Indicates the status of an order
 type OrderStatusResponse struct {
+	// indicates the actual resulting status of the order
 	Status string `json:"status"`
 }
 
 // Metadata about the order that was placed
 type CreateOrderResponse struct {
-	Address         string `json:"address"`
-	TokenId         string `json:"message"`
+	// The ID of the delivery token. A tokenId is unique within a given contract.
+	TokenId string `json:"message"`
+	// The address of the contract that manages this token
 	ContractAddress string `json:"contractAddress"`
-	OrderId         string `json:"orderId"`
+	// The unique ID of the order
+	OrderId string `json:"orderId"`
 }
 
 // Indicates the address of the owner of the delivery token
 type TokenOwnerResponse struct {
+	// The ethereum address of the token holder
 	Owner string `json:"owner" format:"address"`
 }
 
@@ -115,7 +120,6 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		})
 	} else {
 		ctx.JSON(200, CreateOrderResponse{
-			Address:         address,
 			TokenId:         tokenId.String(),
 			ContractAddress: address,
 			OrderId:         order.OrderId,
@@ -251,9 +255,10 @@ func (_Controller *OrderController) cancelOrder(ctx *gin.Context) {
 		return
 	}
 
-	//if !isDelivered {
+	// An error from here could indicate that the token was already burned,
+	// did not exist, or that an unapproved user attempted to burn it. This isn't
+	// robust enough to differentiate.
 	_Controller.ContractExecutor.BurnDeliveryToken(order.OrderId)
-	//}
 
 	ctx.JSON(200, OrderStatusResponse{
 		Status: "canceled",

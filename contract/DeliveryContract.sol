@@ -85,8 +85,13 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         super._beforeTokenTransfer(from, to, tokenId);
 
         // if the token is just being minted, it won't belong to anyone so don't check
-        if (from != address(0)) {
-            require(_isApprovedOrOwner(to, tokenId));
+        if (from != address(0) && to != address(0)) {
+            require(_isApprovedOrOwner(to, tokenId), "not approved to transfer this token");
+        }
+
+        // if this token is being burned, 'from' is the owner and 'to' is 0
+        if (to == address(0)) {
+            require(_isApprovedOrOwner(from, tokenId), "not approved to burn this token");
         }
     }
 
