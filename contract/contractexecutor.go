@@ -103,6 +103,7 @@ func (_exec *DeliveryContractExecutor) deployContract() (*common.Address, *Deliv
 	return &contractAddress, tokenContract, nil
 }
 
+// Creates a new token in the delivery contract
 // returns (tokenId, contract address, error)
 func (_exec *DeliveryContractExecutor) MintNFT(purchase *Purchase) (*big.Int, string, error) {
 	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
@@ -178,26 +179,7 @@ func (_exec *DeliveryContractExecutor) PayForGoods(
 	return nil
 }
 
-func (_exec *DeliveryContractExecutor) DeliverOrderAndPayVendor(
-	tokenId int64,
-	buyerPrivateKey string,
-	deliveryPrice int64,
-) error {
-	err := _exec.transferTokenToCustomer(tokenId, buyerPrivateKey, deliveryPrice)
-	if err != nil {
-		return err
-	}
-
-	err = _exec.payVendor(tokenId)
-	if err != nil {
-		log.Errorf("Error paying vendor: %v", err.Error())
-	}
-
-	return nil
-}
-
-// Purches the token from the owner
-func (_exec *DeliveryContractExecutor) transferTokenToCustomer(
+func (_exec *DeliveryContractExecutor) DeliverOrder(
 	tokenId int64,
 	buyerPrivateKey string,
 	deliveryPrice int64,
@@ -221,7 +203,6 @@ func (_exec *DeliveryContractExecutor) transferTokenToCustomer(
 	// txOpts.GasLimit = uint64(300000) // in gas units
 	// txOpts.GasPrice = gasPrice
 
-	// print a balance before and after so we can see that ether was actually transferred
 	_exec.printBalance("customer", buyerAddress)
 	_exec.printBalance("vendor", _exec.VendorAddress)
 	_exec.printBalance("contract", _exec.ContractAddress)
@@ -237,32 +218,6 @@ func (_exec *DeliveryContractExecutor) transferTokenToCustomer(
 	}
 
 	_exec.printBalance("customer", buyerAddress)
-	_exec.printBalance("vendor", _exec.VendorAddress)
-	_exec.printBalance("contract", _exec.ContractAddress)
-	return nil
-}
-
-// transfer the money from the contract to the vendor
-func (_exec *DeliveryContractExecutor) payVendor(tokenId int64) error {
-	nonce, err := _exec.getNonce(_exec.ServerPrivateKey)
-	if err != nil {
-		return err
-	}
-
-	txOpts := bind.NewKeyedTransactor(_exec.ServerPrivateKey)
-	txOpts.Nonce = nonce
-
-	_exec.printBalance("vendor", _exec.VendorAddress)
-	_exec.printBalance("contract", _exec.ContractAddress)
-	tx, err := _exec.ContractInstance.Withdraw(txOpts, big.NewInt(tokenId))
-	if err != nil {
-		return err
-	}
-	err = _exec.waitForMining(tx.Hash(), 30)
-	if err != nil {
-		return err
-	}
-
 	_exec.printBalance("vendor", _exec.VendorAddress)
 	_exec.printBalance("contract", _exec.ContractAddress)
 	return nil

@@ -129,18 +129,16 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 
 // PayForOrder   godoc
 // @Summary      Pays ether from the customer to the delivery contract for the price of the goods
-// @Description  This action changes the status of an order, either by accepting delivery or canceling it
 // @Tags         order
 // @Accept       json
 // @Produce      json
-// @Param        request        body   OrderUpdateRequest true  "Indicates the status of the order. One of ('canceled', 'delivered')"
 // @Param        customerKey    query  string             false "If this is a delivery, the delivery recipient's private key (not a good idea in real life!)"
 // @Param        orderId        path   string             true  "the ID of the order being updated"
-// @Success      200  {object}  OrderStatusResponse
+// @Success      200  {string}  string    "ok"
 // @Failure      400  {object}  ApiError
 // @Failure      404  {object}  ApiError
 // @Failure      500  {object}  ApiError
-// @Router       /order/{orderId} [post]
+// @Router       /payment/order/{orderId} [post]
 func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 	if !validateArgs(ctx, "customerKey") {
 		return
@@ -172,6 +170,8 @@ func (_Controller *OrderController) PayForOrder(ctx *gin.Context) {
 		})
 		return
 	}
+
+	ctx.JSON(200, "ok")
 }
 
 // DeliverOrder  godoc
@@ -267,23 +267,16 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	err = _Controller.ContractExecutor.DeliverOrderAndPayVendor(
-		order.TokenId, 
-		customerPrivateKey, 
-		order.Price, deliveryPrice)
-		
+	err = _Controller.ContractExecutor.DeliverOrder(
+		order.TokenId,
+		customerPrivateKey,
+		deliveryPrice)
+
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),
 		})
 		return
-	}
-
-	err = _Controller.ContractExecutor.PayVendor(order.TokenId)
-	if err != nil {
-		// since the token has already transferred, there is nothing that can be done at this point
-		// from the customer's perspective.
-		log.Error("Could not pay the vendor: %v", err)
 	}
 
 	_Controller.OrderRepository.MarkOrderDelivered(orderId)

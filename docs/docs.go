@@ -191,6 +191,62 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/payment/order/{orderId}": {
+            "post": {
+                "description": "This action changes the status of an order, either by accepting delivery or canceling it",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "Pays ether from the customer to the delivery contract for the price of the goods",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "If this is a delivery, the delivery recipient's private key (not a good idea in real life!)",
+                        "name": "customerKey",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "the ID of the order being updated",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ok",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ApiError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {

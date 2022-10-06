@@ -35,6 +35,7 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     // some mappings to keep state between the various transactions
     mapping(uint256 => Order) private orderByTokenId;
     mapping(string => uint256) private tokenIdByOrderId;
+    mapping(uint256 => bool) private paidByTokenId;
 
     constructor() ERC721("DeliveryToken", "DLV") public {
         vendor = msg.sender;
@@ -62,29 +63,30 @@ contract DeliveryContract is ERC721, ERC721Burnable {
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
 
-        // deliveryPriceByTokenId[tokenId] = deliveryPrice;
-        // orderPriceByTokenId[tokenId] = orderPrice;
-        // recipientByTokenId[tokenId] = allowedPurchaser;
         tokenIdByOrderId[orderId] = tokenId;
         Order memory order = Order(deliveryPrice, orderPrice, allowedPurchaser);
         orderByTokenId[tokenId] = order;
+        paidByTokenId[tokenId] = false;
 
         // the vendor starts out owning the token because they own the goods until paid
         _safeMint(vendor, tokenId);
 
+        // the customer is allowed to receive delivery
+        approve(order.allowedRecipient, tokenId);
+
         emit NFTMinted(tokenId);
     }
 
+    // This is called when the customer pays for the order. The money for the order
+    // is stored in the contract, to be transferred to the vendor upon delivery.
     function payForGoods(uint256 tokenId) public payable {
         require(_exists(tokenId), "That token does not exist");
+        require(paidByTokenId[tokenId] == false, "This order was paid for already");
 
         Order memory order = orderByTokenId[tokenId];
         require(msg.value == order.orderPrice, "Must pay for the item in full");
 
-        // The money now lives in the contract and can be withdrawn by the vendor.
-        // Only after the user has paid for the goods is the customer allowed to accept delivery.
-        // Anyone can pay for the order, but only one user can accept delivery.
-        approve(order.allowedRecipient, tokenId);
+        paidByTokenId[tokenId] = true;
     }
 
     /**
@@ -102,13 +104,16 @@ contract DeliveryContract is ERC721, ERC721Burnable {
 
         Order memory order = orderByTokenId[tokenId];
         require(msg.value == order.deliveryPrice, "Must pay for delivery");
+        
+        //require(address(this).balance >= totalAmount, "The vendor didn't get paid");
+        require(paidByTokenId[tokenId] == true, "Order must be paid for first");
 
         // give the token to the buyer
         safeTransferFrom(vendor, msg.sender, tokenId);
 
-        // send ETH to the seller
+        // send the shipping cost plus delivery cost to the seller
         address payable tokenOwner = address(uint256(vendor));
-        tokenOwner.transfer(msg.value);
+        tokenOwner.transfer(msg.value + order.orderPrice);
 
         emit NftBought(vendor, msg.sender, msg.value);
     }
@@ -119,13 +124,7 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     function burnTokenByOrderId(string memory orderId) public {
         uint256 tokenId = tokenIdByOrderId[orderId];
         require(tokenId != 0, "That token does not exist");
-
-        Order memory order = orderByTokenId[tokenId];
-
-        // refund the purchase price if the order has not been delivered
-        if (ownerOf(tokenId) == vendor) {
-            payable(order.allowedRecipient).transfer(order.orderPrice);
-        }
+        require(ownerOf(tokenId) != vendor, "The token can only be burned after delivery");
 
         delete(tokenIdByOrderId[orderId]);
         delete(orderByTokenId[tokenId]);
@@ -134,16 +133,16 @@ contract DeliveryContract is ERC721, ERC721Burnable {
     }
 
     // allows the vendor to withdraw the money from all the customer purchases and deliveries
-    function withdraw(uint256 tokenId) public {
-        require(msg.sender == vendor, "Only the vendor can withdraw their money");
+    // function withdraw(uint256 tokenId) public {
+    //     require(msg.sender == vendor, "Only the vendor can withdraw their money");
         
-        Order memory order = orderByTokenId[tokenId];
+    //     Order memory order = orderByTokenId[tokenId];
 
-        // can only withdraw money after delivery
-        if (ownerOf(tokenId) != vendor) {
-            payable(vendor).transfer(order.orderPrice + order.deliveryPrice);
-        }
-    }
+    //     // can only withdraw money after delivery
+    //     if (ownerOf(tokenId) != vendor) {
+    //         payable(vendor).transfer(order.orderPrice + order.deliveryPrice);
+    //     }
+    // }
 
     /**
      * This is a hook called by the parent contract before the token is minted, transferred, or burned.
