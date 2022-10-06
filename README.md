@@ -141,6 +141,12 @@ These can all be done through the swagger UI or your tool of choice.
     ```
 
 ## Developing
+This requires a few dev tools:
+- `solc` - compiles the solidity code to bytecode that runs on the Ethereum Virtual Machine (EVM)
+    - [Installation instructions](https://docs.soliditylang.org/en/v0.6.4/installing-solidity.html)
+- `abigen` - generates the ABI definition and the Go bindings that provide wrappers around the raw JSON-RPC calls
+    - Part of the [go-ethereum](https://github.com/ethereum/go-ethereum) package
+
 ### Generating the doc site
 The API docs are generated with `swaggo`: https://github.com/swaggo/swag
 

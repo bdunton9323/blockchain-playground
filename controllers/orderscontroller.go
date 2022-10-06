@@ -52,6 +52,10 @@ type ApiError struct {
 	Error string `json:"error"`
 }
 
+// since I don't have a database of products, just hard code the amounts
+var productPrice int64 = 500
+var deliveryPrice int64 = 75
+
 // CreateOrder godoc
 // @Summary      Create order
 // @Description  Places an order that can later be delivered
@@ -77,13 +81,9 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 	// the customer who is allowed to receive the shipment
 	userAddress := ctx.Query("buyerAddress")
 
-	// make up a price since there is no database of inventory
-	orderPrice := int64(500)
-	deliveryPrice := int64(75)
-
 	purchase := &contract.Purchase{
 		OrderId:          orderId,
-		PurchasePrice:    big.NewInt(orderPrice),
+		PurchasePrice:    big.NewInt(productPrice),
 		DeliveryPrice:    big.NewInt(deliveryPrice),
 		RecipientAddress: userAddress,
 	}
@@ -101,7 +101,7 @@ func (_Controller *OrderController) CreateOrder(ctx *gin.Context) {
 		OrderId:       orderId,
 		ItemId:        itemId,
 		ItemName:      "socks",
-		Price:         orderPrice,
+		Price:         productPrice,
 		DeliveryPrice: deliveryPrice,
 		TokenAddress:  address,
 		TokenId:       tokenId.Int64(),
@@ -216,9 +216,7 @@ func (_Controller *OrderController) deliverOrder(ctx *gin.Context) {
 	}
 
 	// buy the token from the vendor, thereby accepting delivery of the package
-	// TODO: get the delivery price from the database
-	deliveryPrice := 75
-	err = _Controller.ContractExecutor.BuyNFT(order.TokenId, customerPrivateKey, order.Price, int64(deliveryPrice))
+	err = _Controller.ContractExecutor.BuyNFT(order.TokenId, customerPrivateKey, order.Price, deliveryPrice)
 	if err != nil {
 		ctx.JSON(500, ApiError{
 			Error: err.Error(),
