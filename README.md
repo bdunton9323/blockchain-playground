@@ -10,7 +10,7 @@ A customer orders a product from the vendor. The vendor creates a non-fungible t
 using the delivery contract (which is viewable by all parties). To accept delivery, the
 designated recipient (and _only_ the designated recipient) must purchase the token from the
 vendor. This serves as definitive proof that the goods have traded hands, _and_ that the
-designated recipient was the one who received them. 
+designated recipient was the one who received them.
 
 ## Applicability in the Real World
 This is a toy scenario, but solutions like this have real-world value. The following scenarios
@@ -28,18 +28,16 @@ npm install @openzeppelin/contracts@3.4.2
 ```
 
 Install Quorum, a development ethereum blockchain that runs locally in docker:
-1. Make a directory for the quorum installation somewhere on your machine:
+1. Check out two git repositories. The directories must be side-by-side for some of the scripts to work.
     ```
     ~$ mkdir kaleido-io
-    ```
-2. Check out two git repositories into the new directory
-    ```
     ~$ cd kaleido-io
     ~/kaleido-io$ git clone git@github.com:kaleido-io/quorum-tools.git
     ~/kaleido-io$ git clone git@github.com:kaleido-io/quorum.git
     ```
-3. Copy the genesis file to the quorum mount directories. This sets up the initial block of the chain, including things like
-    starting off with Ether in your account. This genesis file is what I needed to get it working, but YMMV.
+2. Overwrite the default genesis file in the quorum mount directories. 
+    This sets up the initial block of the chain, including things like starting off with Ether 
+    in the sample account. This genesis file is what I needed to get it working, but YMMV.
     ```
     # Substitute with your own
     QUORUM_PATH=~/kaleido-io/quorum-tools/examples
@@ -48,26 +46,29 @@ Install Quorum, a development ethereum blockchain that runs locally in docker:
     ~/blockchain-playground$ cp genesis.json $QUORUM_PATH/qdata_3/ethereum
     ~/blockchain-playground$ cp genesis.json $QUORUM_PATH/qdata_4/ethereum
     ```
-4. Run quorum
+3. Run quorum
     ```
     ~/kaleido-io$ cd quorum-tools/examples
     # on your machine you might need "docker-compose" instead of "docker compose"
     ~/kaleido-io/quorum-tools/examples$ docker compose up
     ```
-5. Spin up a fresh database locally. From the `blockchain-playground` checkout directory:
+
+Spin up a fresh database locally.
+1. From the `blockchain-playground` base directory:
    ```
    ~/blockchain-playground$ cd database
    ~/blockchain-playground/database$ docker compose up -d
    ```
-   This will take a minute to come up. Run `docker ps` and Make sure you see `mariadb` in the list of running containers
+2. This will take a minute to come up. Run `docker ps` and Make sure you see `mariadb` in the list of running containers
 
-   Connect to the database with your favorite too. I use `mysql-client` from the linux package manager. Connect
+   You can Connect to the database with your favorite tool. I use `mysql-client` from the linux package manager. Connect
    with the following credentials:
    - username: db_user
    - password: mysqlPassword
    - host: 127.0.0.1
 
 ### Run the microservice
+#### Option 1: Run it as a standalone app
 Run the service with a private key that matches up with the test queries below. This is the key the
 server will use for signing requests to the blockchain.
 ```
@@ -78,7 +79,7 @@ If you have an existing smart contract deployed and you don't want to recreate i
 go run . -privatekey "<...>" -contractAddress "0xa8BBE18821035E7CBf64dA9d784e2846994b174E"
 ```
 
-## Build and run using docker
+#### Option 2: Build and run using docker
 ```
 ~/blockchain-playground$ docker build -t blockchain-playground .
 ~/blockchain-playground$ docker run --rm -p 8080:8080 blockchain-playground
