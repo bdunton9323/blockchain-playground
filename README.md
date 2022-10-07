@@ -16,7 +16,7 @@ designated recipient was the one who received them.
 This is a toy scenario, but solutions like this have real-world value. The following scenarios
 should be relatable:
 - "I paid for expedited shipping, and it arrived too late to be useful"
-- _Customer_: "I didn't get my stuff!". _Vendor_: "Too bad, my records show it was delivered." 
+- Customer: "I didn't get my stuff!". Vendor: "Too bad, my records show it was delivered." 
 - "I asked for signature verification, but the driver just dropped it on my porch and left"
 
 ## Running it
@@ -24,7 +24,7 @@ should be relatable:
 Install OpenZeppelin, which provides the implementation of the NFT standard (ERC721) that I am extending.
 From the root of the project:
 ```
-npm install @openzeppelin/contracts@3.4.2
+npm install
 ```
 
 Install Quorum, a development ethereum blockchain that runs locally in docker:
@@ -61,11 +61,11 @@ Spin up a fresh database locally.
    ```
 2. This will take a minute to come up. Run `docker ps` and Make sure you see `mariadb` in the list of running containers
 
-   mainYou can Connect to the database with your favorite tool. I use `mysql-client` from the linux package manager. Connect
+   You can Connect to the database with your favorite tool. I use `mysql-client` from the linux package manager. Connect
    with the following credentials:
-   - username: db_user
-   - password: mysqlPassword
-   - host: 127.0.0.1
+   - **username**: db_user
+   - **password**: mysqlPassword
+   - **host**: 127.0.0.1
 
 ### Run the microservice
 #### Option 1: Run it as a standalone app
@@ -91,6 +91,7 @@ If you have the microservice running, you can view the interactive swagger page 
 If you prefer static docs over interactive ones, they can be found at [./docs](https://github.com/bdunton9323/blockchain-playground/tree/main/docs).
 
 Here is some test data to get you going:
+
 Server's data: 
 - private key: `ae65abc8077ef5dd90eb22615f6ae708196bd4e580eae02a09d671cd83305c7b`
 - address: `0x6066A53027eD103D934cD122Cd0C7AF2b9279c69`
@@ -102,6 +103,7 @@ Customer's data:
 ### Demonstration flow
 These can all be done through the swagger UI or your tool of choice.
 1. Place an order:
+
     This tells the microservice to create an order. You should see it in the database as well as the server's logs.
     This will mint a token and assign it to the server's account address.
     ```
@@ -122,6 +124,7 @@ These can all be done through the swagger UI or your tool of choice.
         -H 'accept: application/json'
     ```
 3. Accept delivery of the order:
+
     This will cause the customer to purchase the token from the vendor for the total cost plus shipping.
     Transmitting your private key to a server is not a realistic scenario, but it serves the purpose for the demo.
     ```
@@ -138,6 +141,7 @@ These can all be done through the swagger UI or your tool of choice.
         -H 'accept: application/json'
     ```
 5. Burn the token
+    
     The customer does not need to retain the delivery receipt forever, so destroy it!
     ```
     curl -X 'POST' \
